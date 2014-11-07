@@ -7,8 +7,8 @@
 	<attribute name="Elapsed Time" value="97.8688" />
 	<attribute name="Next Replicated Node ID" value="1" />
 	<attribute name="Next Replicated Component ID" value="5" />
-	<attribute name="Next Local Node ID" value="16777419" />
-	<attribute name="Next Local Component ID" value="16777244" />
+	<attribute name="Next Local Node ID" value="16777420" />
+	<attribute name="Next Local Component ID" value="16777247" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="waypoint" />
 	<component type="Octree" id="1" />
@@ -123,7 +123,7 @@
 		</component>
 		<component type="CollisionShape" id="16777231">
 			<attribute name="Shape Type" value="Cylinder" />
-			<attribute name="Size" value="3 2 1" />
+			<attribute name="Size" value="3 1.7 1" />
 		</component>
 		<node id="16777332">
 			<attribute name="Is Enabled" value="true" />
@@ -892,5 +892,24 @@
 				<attribute name="Size" value="5 5 5" />
 			</component>
 		</node>
+	</node>
+	<node id="16777419">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="boxNode" />
+		<attribute name="Position" value="9.5134 1.49976 -1.49069" />
+		<attribute name="Rotation" value="0.966524 0 0.256577 0" />
+		<attribute name="Scale" value="5 5 5" />
+		<attribute name="Variables" />
+		<component type="StaticModel" id="16777244">
+			<attribute name="Model" value="Model;Models/Box.mdl" />
+			<attribute name="Material" value="Material;Materials/DefaultMaterial.xml" />
+			<attribute name="Cast Shadows" value="true" />
+		</component>
+		<component type="RigidBody" id="16777245">
+			<attribute name="Physics Rotation" value="0.966524 0 0.256577 0" />
+			<attribute name="Physics Position" value="9.5134 1.49976 -1.49069" />
+			<attribute name="Mass" value="5" />
+		</component>
+		<component type="CollisionShape" id="16777246" />
 	</node>
 </scene>

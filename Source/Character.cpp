@@ -69,7 +69,7 @@ void Character::FixedUpdate(float timeStep)
 	/// \todo Could cache the components for faster access instead of finding them each frame
 	RigidBody* body = GetComponent<RigidBody>();
 
-	const float MOVE_SPEED = 400.0f;
+	const float MOVE_SPEED = 800.0f;
 
 	Input* input = GetSubsystem<Input>();
 

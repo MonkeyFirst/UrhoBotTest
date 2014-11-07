@@ -4,6 +4,7 @@
 #include "AnimatedModel.h"
 #include "AnimationState.h"
 #include "RigidBody.h"
+#include <stack>
 
 namespace Urho3D
 {
@@ -41,6 +42,9 @@ public:
 private:
 	void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
 
+	void ExecuteWayPointsStack(float timeStep);
+	void AddWayPoints(Vector3 position);
+
 	SharedPtr<RigidBody> rigidbody_;
 	SharedPtr<Node> lasersNode_;
 
@@ -51,6 +55,9 @@ private:
 	SharedPtr<AnimatedModel> animModelLasers_;
 	SharedPtr<AnimationState> animStateLasers_;
 
+	SharedPtr<Node> wayPoints[4];
+	std::stack<Vector3> ws;
+	
 
 
 

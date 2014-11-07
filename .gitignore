@@ -45,3 +45,11 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+Build/UrhoBot.dir/debug/UrhoBot_d.pch
+*.pch
+*.pch
+*.ncb
+Build/UrhoBot.dir/release/UrhoBot.pch
+Build/UrhoBot.dir/release/UrhoBot.pch
+Build/UrhoBot.ncb

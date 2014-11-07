@@ -23,18 +23,90 @@ void BotLogic::Start()
 	animModelLasers_ = lasersNode_->GetComponent<AnimatedModel>();
 	
 	animStateIdle_ = animModelBot_->GetAnimationStates()[0];
-	animStateWalk_ = animModelBot_->GetAnimationStates()[1];
-	animStateLasers_ = animModelLasers_->GetAnimationStates()[0];
+	animStateIdle_->SetLooped(true);
+	animStateIdle_->SetLayer(0);
 
-	
+	animStateWalk_ = animModelBot_->GetAnimationStates()[1];
+	animStateWalk_->SetLooped(true);
+	animStateWalk_->SetLayer(1);
+
+
+	animStateLasers_ = animModelLasers_->GetAnimationStates()[0];
+	animStateLasers_->SetWeight(1.0f);
+	animStateLasers_->SetLooped(true);
+	animStateLasers_->AddTime(0.0f);
+
+
+	wayPoints[0]= GetScene()->GetChild("wayPoint0", true);
+	wayPoints[1]= GetScene()->GetChild("wayPoint1", true);
+	wayPoints[2]= GetScene()->GetChild("wayPoint2", true);
+	wayPoints[3]= GetScene()->GetChild("wayPoint3", true);
+	AddWayPoints(wayPoints[0]->GetWorldPosition());
+	AddWayPoints(wayPoints[1]->GetWorldPosition());
+	AddWayPoints(wayPoints[2]->GetWorldPosition());
+	AddWayPoints(wayPoints[3]->GetWorldPosition());
+		
 }
+
+void BotLogic::ExecuteWayPointsStack(float timeStep) 
+{
+	static bool isEndPath = false;
+	const float SPEED = 20.0f;
+
+	if (ws.empty())
+		isEndPath = true;
+	else 
+	{
+		isEndPath = false;
+
+		Vector3 wp = GetNode()->GetWorldPosition();
+		float distance = Vector3(ws.top() - wp).Length();
+	
+		if (distance < 10.0f) 
+		{
+			if (!ws.empty()) 
+			{  
+				ws.pop();
+			}
+			else 
+			{
+				isEndPath = true;
+			}
+		}
+		else 
+		{
+			Vector3 direction(ws.top()- wp);
+			direction.y_ = 0.0f;
+			
+			direction.Normalize();
+			RigidBody* rigidbody_ = GetComponent<RigidBody>();
+			Vector3 target = ws.top();
+			
+			target.y_ = wp.y_; // fix horizont bot see by it self y
+
+			GetNode()->LookAt(target, Vector3::UP, TS_WORLD);
+			Vector3 vel = rigidbody_->GetLinearVelocity();
+			
+			if (vel.Length() < 5.0) rigidbody_->ApplyForce(direction * SPEED);
+			//rigidbody_->SetLinearVelocity(direction * SPEED * timeStep);
+			
+		}
+	}
+
+
+
+}
+
+void BotLogic::AddWayPoints(Vector3 position) 
+{
+	ws.push(position);
+}
+
 
 void BotLogic::Update(float timeStep) 
 {
 
 	RigidBody* rigidbody_ = GetComponent<RigidBody>();
-
-	
 	Vector3 vel = rigidbody_->GetLinearVelocity();
 	float s = vel.Length();
 
@@ -42,26 +114,30 @@ void BotLogic::Update(float timeStep)
 	{
 		
 		animStateWalk_->SetWeight( s > 1.0f ? 1.0f : s );
-		animStateWalk_->SetLooped(true);
 		animStateWalk_->AddTime(timeStep);
-		animStateWalk_->SetLayer(1);
+
 
 	}
 
 	if (animStateIdle_) 
 	{
 		animStateIdle_->SetWeight(1.0f);
-		animStateIdle_->SetLooped(true);
 		animStateIdle_->AddTime(timeStep);
-		animStateIdle_->SetLayer(0);
 	}
 
 	if (animStateLasers_) 
 	{
-		animStateLasers_->SetWeight(1.0f);
-		animStateLasers_->SetLooped(true);
-		animStateLasers_->AddTime(timeStep);
-		
+		if (s > 0.1f) 
+		{
+			animStateLasers_->AddTime(timeStep);
+			// set normal speed animation
+			//animStateLasers_->SetSpeed(1.0f);
+		}else 
+		{
+			animStateLasers_->AddTime(timeStep / 2.0f);
+			//slowdown animation speed by half
+			//animStateLasers_->SetSpeed(0.5f);		
+		}
 		
 	}
 
@@ -126,6 +202,8 @@ void BotLogic::FixedUpdate(float timeStep)
 	{
 		isRightPressed = false;
 	}
+
+	ExecuteWayPointsStack(timeStep);
 
 }
 
