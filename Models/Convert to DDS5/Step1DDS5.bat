@@ -1,0 +1,1 @@
+nvdxt.exe -all -dxt5 -alpha
