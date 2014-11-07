@@ -26,7 +26,6 @@ void BotLogic::Start()
 	animStateWalk_ = animModelBot_->GetAnimationStates()[1];
 	animStateLasers_ = animModelLasers_->GetAnimationStates()[0];
 
-
 	
 }
 
