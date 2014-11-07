@@ -1,0 +1,3 @@
+F:/GIT_PROJECTS/UrhoBotTest/Build/CMakeFiles/ALL_BUILD.dir
+F:/GIT_PROJECTS/UrhoBotTest/Build/CMakeFiles/UrhoQuickStart.dir
+F:/GIT_PROJECTS/UrhoBotTest/Build/CMakeFiles/ZERO_CHECK.dir
