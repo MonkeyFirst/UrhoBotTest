@@ -18,19 +18,39 @@ void BotLogic::Start()
 	SubscribeToEvent(GetNode(), E_NODECOLLISION, HANDLER(BotLogic, HandleNodeCollision));
 	rigidbody_ = GetNode()->GetComponent<RigidBody>();
 
+	animModelBot_ = GetComponent<AnimatedModel>();
+	lasersNode_ = GetNode()->GetChild("lasersNode", true);
+	animModelLasers_ = lasersNode_->GetComponent<AnimatedModel>();
+	
+	animStateWalk_ = animModelBot_->GetAnimationStates()[0];
+	animStateIdle_ = animModelBot_->GetAnimationStates()[1];
+	animStateLasers_ = animModelLasers_->GetAnimationStates()[0];
 
+
+	
 }
 
 void BotLogic::Update(float timeStep) 
 {
-	AnimatedModel* model = GetComponent<AnimatedModel>();
-	if (model->GetNumAnimationStates())
+	if (animStateWalk_)
 	{
-		AnimationState* state = model->GetAnimationStates()[1];
-		// Enable full blending weight and looping
-		state->SetWeight(1.0f);
-		state->SetLooped(true);
-		state->AddTime(timeStep);
+		animStateWalk_->SetWeight(1.0f);
+		animStateWalk_->SetLooped(true);
+		animStateWalk_->AddTime(timeStep);
+	}
+
+	if (animStateIdle_) 
+	{
+		animStateIdle_->SetWeight(1.0f);
+		animStateIdle_->SetLooped(true);
+		animStateIdle_->AddTime(timeStep);
+	}
+
+	if (animStateLasers_) 
+	{
+		animStateLasers_->SetWeight(1.0f);
+		animStateLasers_->SetLooped(true);
+		animStateLasers_->AddTime(timeStep);
 	}
 
 }

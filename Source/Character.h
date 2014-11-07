@@ -43,8 +43,6 @@ public:
 private:
 	bool Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawable);
 	void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
-	void PaintDecal();
-	void CreateBullet();
 
 	SharedPtr<RigidBody> rigidbody_;
 	Quaternion rotation_;

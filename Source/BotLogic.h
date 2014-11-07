@@ -1,6 +1,7 @@
 #pragma once
 #include "Common.h"
 #include "LogicComponent.h"
+#include "AnimatedModel.h"
 
 namespace Urho3D
 {
@@ -10,6 +11,7 @@ namespace Urho3D
 	class RigidBody;
 	class LogicComponent;
 	class Drawable;
+	class AnimationModel;
 };
 
 using namespace Urho3D;
@@ -37,6 +39,15 @@ private:
 	void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
 
 	SharedPtr<RigidBody> rigidbody_;
+	SharedPtr<Node> lasersNode_;
+
+	SharedPtr<AnimatedModel> animModelBot_;
+	SharedPtr<AnimationState> animStateWalk_;
+	SharedPtr<AnimationState> animStateIdle_;
+
+	SharedPtr<AnimatedModel> animModelLasers_;
+	SharedPtr<AnimationState> animStateLasers_;
+
 
 
 

@@ -30,57 +30,6 @@ void Character::Update(float timeStep)
 
 }
 
-void Character::CreateBullet() 
-{
-	Vector3 origin = gunNode_->GetWorldPosition();
-	Vector3 dir = gunNode_->GetWorldDirection();
-	ResourceCache* cache = GetSubsystem<ResourceCache>();
-
-	XMLFile* cubePrebabFile = cache->GetResource<XMLFile>("Objects/bullet.xml");
-	Node* bullet = GetNode()->GetScene()->InstantiateXML(cubePrebabFile->GetRoot(), origin, Quaternion(0.0f,0.0f,0.0f), LOCAL);
-	//StaticModel* boxStaticModel = bullet->CreateComponent<StaticModel>();
-	//boxStaticModel->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-	//boxStaticModel->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
-
-	//RigidBody* r = bullet->CreateComponent<RigidBody>();
-	//r->SetMass(0.1f);
-	//r->SetLinearVelocity(dir * 100.0f);
-	//
-	//CollisionShape* c = bullet->CreateComponent<CollisionShape>();
-	//c->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-	bullet->SetScale(Vector3(0.1f, 0.1f, 0.1f));
-	RigidBody* r = bullet->GetComponent<RigidBody>();
-	r->SetLinearVelocity(dir * 30.0f);
-
-}
-
-void Character::PaintDecal()
-{
-	Vector3 hitPos;
-	Drawable* hitDrawable;
-
-	if (Raycast(250.0f, hitPos, hitDrawable))
-	{
-		// Check if target scene node already has a DecalSet component. If not, create now
-		Node* targetNode = hitDrawable->GetNode();
-		DecalSet* decal = targetNode->GetComponent<DecalSet>();
-		if (!decal)
-		{
-			ResourceCache* cache = GetSubsystem<ResourceCache>();
-
-			decal = targetNode->CreateComponent<DecalSet>();
-			decal->SetMaterial(cache->GetResource<Material>("Materials/UrhoDecal.xml"));
-		}
-		// Add a square decal to the decal set using the geometry of the drawable that was hit, orient it to face the camera,
-		// use full texture UV's (0,0) to (1,1). Note that if we create several decals to a large object (such as the ground
-		// plane) over a large area using just one DecalSet component, the decals will all be culled as one unit. If that is
-		// undesirable, it may be necessary to create more than one DecalSet based on the distance
-		decal->AddDecal(hitDrawable, hitPos, cameraNode_->GetRotation(), 0.5f, 1.0f, 1.0f, Vector2::ZERO,
-			Vector2::ONE);
-	}
-}
-
-
 bool Character::Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawable)
 {
 	hitDrawable = 0;
@@ -165,8 +114,7 @@ void Character::FixedUpdate(float timeStep)
 	{
 		if (!isAlradyFired) 
 		{
-			PaintDecal();
-			CreateBullet();
+			
 			isAlradyFired = true;
 		}	
 	} 
@@ -187,7 +135,7 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 	Vector3 pos = contacts.ReadVector3(); // точка столкновения
 
 	Variant myAttr = contact_node->GetVar("type");
-	if ( myAttr.GetString() == "grib") 
+	if ( myAttr.GetString() == "value") 
 	{
 
 	}
