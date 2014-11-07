@@ -2,6 +2,8 @@
 #include "Common.h"
 #include "LogicComponent.h"
 #include "AnimatedModel.h"
+#include "AnimationState.h"
+#include "RigidBody.h"
 
 namespace Urho3D
 {
@@ -12,6 +14,7 @@ namespace Urho3D
 	class LogicComponent;
 	class Drawable;
 	class AnimationModel;
+	class AnimationState;
 };
 
 using namespace Urho3D;
