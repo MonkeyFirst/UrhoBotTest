@@ -23,6 +23,8 @@
 #include "Scene.h"
 #include "Octree.h"
 #include "StaticModel.h"
+#include "AnimatedModel.h"
+#include "AnimationState.h"
 #include "Light.h"
 #include "Model.h"
 #include "Material.h"

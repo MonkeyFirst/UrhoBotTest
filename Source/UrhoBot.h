@@ -3,6 +3,8 @@
 #include "Application.h"
 #include "Plane.h"
 #include "RigidBody.h"
+#include "Character.h"
+#include "BotLogic.h"
 
 namespace Urho3D
 {
@@ -26,6 +28,10 @@ protected:
 	SharedPtr<Scene> scene_;
 	SharedPtr<Node> cameraNode_;
 	SharedPtr<Node> playerNode_;
+	WeakPtr<Character> playerScript_;
+
+	SharedPtr<Node> botNode_;
+	WeakPtr<BotLogic> botScript_;
 
 
 private:

@@ -13,6 +13,10 @@ UrhoQuickStart::UrhoQuickStart(Context* context) : Application(context)
 	//engineParameters_["RenderPath"] = "Bin\CoreData\RenderPaths\Deferred.xml";
 	//engineParameters_["FlushGPU"] = true;
 
+	//register scripts
+	Character::RegisterObject(context_);
+	BotLogic::RegisterObject(context_);
+
 }
 
 void UrhoQuickStart::Start()
@@ -20,6 +24,10 @@ void UrhoQuickStart::Start()
 	Graphics* graphics = GetSubsystem<Graphics>();
 	Renderer* renderer = GetSubsystem<Renderer>();
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+	renderer->SetTextureFilterMode(FILTER_ANISOTROPIC);
+	renderer->SetTextureAnisotropy(16);
+
 	CreateConsole();
 	SubscribeToEvents();
 	LoadScene("MainScene.xml");
@@ -58,6 +66,14 @@ void UrhoQuickStart::OtherSetup()
 	Graphics* graphics = GetSubsystem<Graphics>();
 	Renderer* renderer = GetSubsystem<Renderer>();
 	ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+	playerNode_ = scene_->GetChild("playerNode", true);
+	playerScript_ = playerNode_->CreateComponent<Character>();
+	
+	botNode_ = scene_->GetChild("botNode", true);
+	botScript_ = botNode_->CreateComponent<BotLogic>();
+
+
 
 }
 
