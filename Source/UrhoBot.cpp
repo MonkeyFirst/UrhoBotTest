@@ -33,8 +33,19 @@ void UrhoQuickStart::Start()
 	LoadScene("MainScene.xml");
 	CameraSetup("cameraNode");
 	OtherSetup();
+	GenerateNavMesh();
 
 }
+
+void UrhoQuickStart::GenerateNavMesh()
+{
+	NavigationMesh* navMesh = scene_->CreateComponent<NavigationMesh>();
+	scene_->CreateComponent<Navigable>();
+	navMesh->SetPadding(Vector3(0.0f, 1.0f, 0.0f));
+	navMesh->SetAgentRadius(2.0f);
+	navMesh->Build();
+}
+
 
 void UrhoQuickStart::LoadScene(Urho3D::String sceneFileName) 
 {
@@ -58,6 +69,31 @@ void UrhoQuickStart::CameraSetup(Urho3D::String cameraNodeName)
 
 	yaw_ = 0.0f;
 	pitch_ = 0.0f;	
+}
+
+bool UrhoQuickStart::Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawable)
+{
+	hitDrawable = 0;
+
+	UI* ui = GetSubsystem<UI>();
+	IntVector2 pos = ui->GetCursorPosition();
+
+	Graphics* graphics = GetSubsystem<Graphics>();
+	Camera* camera = cameraNode_->GetComponent<Camera>();
+	Ray cameraRay = camera->GetScreenRay((float)pos.x_ / graphics->GetWidth(), (float)pos.y_ / graphics->GetHeight());
+	// Pick only geometry objects, not eg. zones or lights, only get the first (closest) hit
+	PODVector<RayQueryResult> results;
+	RayOctreeQuery query(results, cameraRay, RAY_TRIANGLE, maxDistance, DRAWABLE_GEOMETRY);
+	scene_->GetComponent<Octree>()->RaycastSingle(query);
+	if (results.Size())
+	{
+		RayQueryResult& result = results[0];
+		hitPos = result.position_;
+		hitDrawable = result.drawable_;
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -96,6 +132,7 @@ void UrhoQuickStart::SubscribeToEvents()
 	SubscribeToEvent(E_UPDATE, HANDLER(UrhoQuickStart, HandleUpdate));
 	SubscribeToEvent(E_KEYDOWN, HANDLER(UrhoQuickStart, HandleKeyDown));
 	SubscribeToEvent(E_SCENEUPDATE, HANDLER(UrhoQuickStart, HandleSceneUpdate));
+	SubscribeToEvent(E_POSTRENDERUPDATE, HANDLER(UrhoQuickStart, HandlePostRenderUpdate));
 }
 
 void UrhoQuickStart::CameraViewRotate(float timeStep) 
@@ -138,7 +175,7 @@ void UrhoQuickStart::HandleKeyDown(StringHash eventType, VariantMap& eventData)
 {
 	using namespace KeyDown;
 	int key = eventData[P_KEY].GetInt();
-
+	
 	if (key == KEY_ESC)
 	{
 		Console* console = GetSubsystem<Console>();
@@ -153,10 +190,35 @@ void UrhoQuickStart::HandleKeyDown(StringHash eventType, VariantMap& eventData)
 		Console* console = GetSubsystem<Console>();
 		console->Toggle();
 	}
+
+	if (key == KEY_F2) drawDebug_ = !drawDebug_;
+
+	if (key == KEY_E) 
+	{
+		Vector3 hitPos;
+		Drawable* hitDrawable;
+		NavigationMesh* navMesh = scene_->GetComponent<NavigationMesh>();
+
+		if (Raycast(250.0f, hitPos, hitDrawable)) 
+		{
+			Vector3 pathPos = navMesh->FindNearestPoint(hitPos, Vector3(2.0f, 2.0f, 2.0f));
+			
+			botScript_->AddPath(botNode_->GetWorldPosition(), pathPos);
+			
+		}
+	}
 }
 
 void UrhoQuickStart::HandleSceneUpdate(StringHash eventType, VariantMap& eventData)
 {
 
 
+}
+
+void UrhoQuickStart::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
+{
+	if (drawDebug_) {
+		scene_->GetComponent<NavigationMesh>()->DrawDebugGeometry(true);
+		botScript_->DrawBotDebugInfo();
+	}
 }

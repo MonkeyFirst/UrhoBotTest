@@ -41,14 +41,19 @@ private:
 	void CameraSetup(Urho3D::String cameraNodeName);
 	void OtherSetup();
 	void CameraViewRotate(float timeStep);
-	
+	void GenerateNavMesh();
+	bool Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawable);
+
 	void HandleUpdate(StringHash eventType, VariantMap& eventData);
 	void HandleKeyDown(StringHash eventType, VariantMap& eventData);
 	void HandleSceneUpdate(StringHash eventType, VariantMap& eventData);
+	void HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData);
 
 	bool paused_;
 	float yaw_;
 	float pitch_;
+
+	bool drawDebug_;
 
 
 };

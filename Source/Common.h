@@ -48,3 +48,7 @@
 #include "ValueAnimationInfo.h"
 #include "DecalSet.h"
 #include "PackageFile.h"
+
+#include "NavigationMesh.h"
+#include "Navigable.h"
+#include "DebugRenderer.h"

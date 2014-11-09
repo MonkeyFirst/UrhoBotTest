@@ -35,15 +35,23 @@ public:
 
 	// גûחûגאועסÿ ךאזהûי ךאהנ ?
 	void Update(float timeStep);
-
+	
 	/// Handle physics world update. Called by LogicComponent base class.
 	virtual void FixedUpdate(float timeStep);
+
+	void DrawBotDebugInfo();
+
+	void AddPath(Vector3 start_, Vector3 end_);
+	void FollowPath(float timeStep);
+
+
+	void ExecuteWayPointsStack(float timeStep);
+	void AddWayPoints(Vector3 position);
 
 private:
 	void HandleNodeCollision(StringHash eventType, VariantMap& eventData);
 
-	void ExecuteWayPointsStack(float timeStep);
-	void AddWayPoints(Vector3 position);
+
 
 	SharedPtr<RigidBody> rigidbody_;
 	SharedPtr<Node> lasersNode_;
@@ -57,6 +65,7 @@ private:
 
 	SharedPtr<Node> wayPoints[4];
 	std::stack<Vector3> ws;
+	PODVector<Vector3> currentPath_;
 	
 
 

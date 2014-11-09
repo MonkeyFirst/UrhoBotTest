@@ -48,6 +48,64 @@ void BotLogic::Start()
 		
 }
 
+void BotLogic::AddPath(Vector3 start_, Vector3 end_) 
+{
+	currentPath_.Clear();
+	NavigationMesh* navMesh = GetNode()->GetScene()->GetComponent<NavigationMesh>();
+	navMesh->FindPath(currentPath_, start_, end_);
+}
+
+void BotLogic::FollowPath(float timeStep)
+{
+	if (currentPath_.Size())
+	{
+		Vector3 nextWaypoint = currentPath_[0]; // NB: currentPath[0] is the next waypoint in order
+
+		// Rotate Jack toward next waypoint to reach and move. Check for not overshooting the target
+		float SPEED = 20.0f;
+		float distance = (GetNode()->GetWorldPosition() - nextWaypoint).Length();
+		
+		Vector3 dir = nextWaypoint - GetNode()->GetWorldPosition();
+		Vector3 lookAt = nextWaypoint;
+
+		dir.y_ = GetNode()->GetWorldPosition().y_;
+		lookAt.y_ = GetNode()->GetWorldPosition().y_;
+
+		dir.Normalize();
+		GetNode()->LookAt(lookAt, Vector3::UP, TS_WORLD);
+		
+		RigidBody* rigidbody_ = GetComponent<RigidBody>();
+		Vector3 vel = rigidbody_->GetLinearVelocity();
+		if (vel.Length() < 5.0f) rigidbody_->ApplyForce(dir * SPEED);
+		
+		//GetNode()->Translate(Vector3::FORWARD * move);
+
+		// Remove waypoint if reached it
+		if ((GetNode()->GetWorldPosition() - nextWaypoint).Length() < 3.0f)
+			currentPath_.Erase(0);
+	}
+}
+
+void BotLogic::DrawBotDebugInfo() 
+{
+	DebugRenderer* debug = GetNode()->GetScene()->GetComponent<DebugRenderer>();
+	if (!ws.empty())
+		debug->AddLine(GetNode()->GetWorldPosition(), ws.top(), Color(1.0f, 1.0f, 1.0f));
+
+
+	if (currentPath_.Size() > 0)
+	{
+		Vector3 offset(0.0f,0.5f,0.0f);
+		
+		debug->AddLine(GetNode()->GetPosition() + offset, currentPath_[0] + offset, Color(1.0f, 1.0f, 1.0f));
+		
+
+		for (unsigned i = 0; i < currentPath_.Size() - 1; ++i)
+			debug->AddLine(currentPath_[i] + offset, currentPath_[i + 1]+offset, Color(1.0f, 1.0f, 1.0f));
+	}
+
+}
+
 void BotLogic::ExecuteWayPointsStack(float timeStep) 
 {
 	static bool isEndPath = false;
@@ -203,8 +261,10 @@ void BotLogic::FixedUpdate(float timeStep)
 		isRightPressed = false;
 	}
 
-	ExecuteWayPointsStack(timeStep);
-
+	if (currentPath_.Size() == 0)
+		ExecuteWayPointsStack(timeStep);
+	else
+		FollowPath(timeStep);
 }
 
 void BotLogic::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
