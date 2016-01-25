@@ -15,6 +15,7 @@ An attempt to convert the project [MonkeyFirst/UrhoBotTest](https://github.com/M
     $ git checkout migrate_to_urho3d_1_5
     $ mkdir build
     $ cd build
+    $ export URHO3D_HOME=/home/valera/projects/Urho3D-1.5/build
     $ cmake ../
     $ make
 
