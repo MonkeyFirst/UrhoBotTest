@@ -24,6 +24,7 @@ Color componentTextColor(0.7f, 1.0f, 0.7f);
 
 Window@ hierarchyWindow;
 ListView@ hierarchyList;
+bool showID = true;
 
 // UIElement does not have unique ID, so use a running number to generate a new ID each time an item is inserted into hierarchy list
 const uint UI_ELEMENT_BASE_ID = 1;
@@ -56,7 +57,7 @@ void CreateHierarchyWindow()
     if (hierarchyWindow !is null)
         return;
 
-    hierarchyWindow = ui.LoadLayout(cache.GetResource("XMLFile", "UI/EditorHierarchyWindow.xml"));
+    hierarchyWindow = LoadEditorUI("UI/EditorHierarchyWindow.xml");
     hierarchyList = hierarchyWindow.GetChild("HierarchyList");
     ui.root.AddChild(hierarchyWindow);
     int height = Min(ui.root.height - 60, 460);
@@ -77,6 +78,8 @@ void CreateHierarchyWindow()
     SubscribeToEvent(hierarchyWindow.GetChild("CloseButton", true), "Released", "HideHierarchyWindow");
     SubscribeToEvent(hierarchyWindow.GetChild("ExpandButton", true), "Released", "ExpandCollapseHierarchy");
     SubscribeToEvent(hierarchyWindow.GetChild("CollapseButton", true), "Released", "ExpandCollapseHierarchy");
+    SubscribeToEvent(hierarchyWindow.GetChild("ResetButton", true), "Released", "CollapseHierarchy");
+    SubscribeToEvent(hierarchyWindow.GetChild("ShowID", true), "Toggled", "HandleShowID");
     SubscribeToEvent(hierarchyList, "SelectionChanged", "HandleHierarchyListSelectionChange");
     SubscribeToEvent(hierarchyList, "ItemDoubleClicked", "HandleHierarchyListDoubleClick");
     SubscribeToEvent(hierarchyList, "ItemClicked", "HandleHierarchyItemClick");
@@ -92,11 +95,19 @@ void CreateHierarchyWindow()
     SubscribeToEvent("TemporaryChanged", "HandleTemporaryChanged");
 }
 
-bool ShowHierarchyWindow()
+bool ToggleHierarchyWindow()
+{
+    if (hierarchyWindow.visible == false)
+        ShowHierarchyWindow();
+    else
+        HideHierarchyWindow();
+    return true;
+}
+
+void ShowHierarchyWindow()
 {
     hierarchyWindow.visible = true;
     hierarchyWindow.BringToFront();
-    return true;
 }
 
 void HideHierarchyWindow()
@@ -322,7 +333,7 @@ void SetID(Text@ text, Serializable@ serializable, int itemType = ITEM_NONE)
 
     text.vars[TYPE_VAR] = itemType;
     text.vars[ID_VARS[itemType]] = GetID(serializable, itemType);
-    
+
     // Set node ID as drag and drop content for node ID editing
     if (itemType == ITEM_NODE)
         text.vars[DRAGDROPCONTENT_VAR] = String(text.vars[NODE_ID_VAR].GetUInt());
@@ -464,28 +475,33 @@ String GetNodeTitle(Node@ node)
         ret = node.typeName;
     else
         ret = node.name;
+    
+    if (showID)
+    {
+        if (node.id >= FIRST_LOCAL_ID)
+            ret += " (Local " + String(node.id) + ")";
+        else
+            ret += " (" + String(node.id) + ")";
 
-    if (node.id >= FIRST_LOCAL_ID)
-        ret += " (Local " + String(node.id) + ")";
-    else
-        ret += " (" + String(node.id) + ")";
-
-    if (node.temporary)
-        ret += " (Temp)";
-
+        if (node.temporary)
+            ret += " (Temp)";
+    }
+    
     return ret;
 }
 
 String GetComponentTitle(Component@ component)
 {
     String ret = component.typeName;
+    
+    if (showID)
+    {
+        if (component.id >= FIRST_LOCAL_ID)
+            ret += " (Local)";
 
-    if (component.id >= FIRST_LOCAL_ID)
-        ret += " (Local)";
-
-    if (component.temporary)
-        ret += " (Temp)";
-
+        if (component.temporary)
+            ret += " (Temp)";
+    }
     return ret;
 }
 
@@ -497,6 +513,7 @@ void SelectNode(Node@ node, bool multiselect)
         return;
     }
 
+    lastSelectedNode = node;
     uint index = GetListIndex(node);
     uint numItems = hierarchyList.numItems;
 
@@ -625,7 +642,7 @@ void HandleHierarchyListSelectionChange()
         else if (type == ITEM_NODE)
         {
             Node@ node = GetListNode(index);
-            if (node !is null)
+            if (node !is null) 
                 selectedNodes.Push(node);
         }
         else if (type == ITEM_UI_ELEMENT)
@@ -635,7 +652,7 @@ void HandleHierarchyListSelectionChange()
                 selectedUIElements.Push(element);
         }
     }
-
+    
     // If only one node/UIElement selected, use it for editing
     if (selectedNodes.length == 1)
         editNode = selectedNodes[0];
@@ -744,6 +761,14 @@ void HandleHierarchyListDoubleClick(StringHash eventType, VariantMap& eventData)
         Node@ node = editorScene.GetNode(item.vars[NODE_ID_VAR].GetUInt());
         LocateNode(node);
     }
+
+    bool isExpanded = hierarchyList.IsExpanded(hierarchyList.selection);
+
+    if (!isExpanded && eventData["Button"].GetInt() == MOUSEB_LEFT) 
+    {
+        isExpanded = !isExpanded;  
+        hierarchyList.Expand(hierarchyList.selection, isExpanded, false); 
+    }
 }
 
 void HandleHierarchyItemClick(StringHash eventType, VariantMap& eventData)
@@ -787,6 +812,7 @@ void HandleHierarchyItemClick(StringHash eventType, VariantMap& eventData)
     {
         actions.Push(CreateContextMenuItem("Create Replicated Node", "HandleHierarchyContextCreateReplicatedNode"));
         actions.Push(CreateContextMenuItem("Create Local Node", "HandleHierarchyContextCreateLocalNode"));
+        actions.Push(CreateContextMenuItem("Duplicate", "HandleHierarchyContextDuplicate"));
         actions.Push(CreateContextMenuItem("Copy", "HandleHierarchyContextCopy"));
         actions.Push(CreateContextMenuItem("Cut", "HandleHierarchyContextCut"));
         actions.Push(CreateContextMenuItem("Delete", "HandleHierarchyContextDelete"));
@@ -843,8 +869,6 @@ void HandleDragDropFinish(StringHash eventType, VariantMap& eventData)
             if (targetNode is null)
                 return;
 
-            // editNode = targetNode;
-
             if (type == RESOURCE_TYPE_PREFAB)
             {
                 LoadNode(browserFile.GetFullPath(), targetNode);
@@ -875,12 +899,16 @@ void HandleDragDropFinish(StringHash eventType, VariantMap& eventData)
             {
                 if (browserFile.extension == "xml")
                 {
-                    ParticleEffect2D@ effect = cache.GetResource("ParticleEffect2D", browserFile.resourceKey);
+                    Resource@ effect = cache.GetResource("ParticleEffect2D", browserFile.resourceKey);
                     if (effect is null)
                         return;
 
-                    ParticleEmitter2D@ emitter = targetNode.CreateComponent("ParticleEmitter2D");
-                    emitter.effect = effect;
+                    ResourceRef effectRef;
+                    effectRef.type = effect.type;
+                    effectRef.name = effect.name;
+
+                    Component@ emitter = targetNode.CreateComponent("ParticleEmitter2D");
+                    emitter.SetAttribute("Particle Effect", Variant(effectRef));
                     createdComponent = emitter;
                 }
             }
@@ -1400,6 +1428,7 @@ void HandleTemporaryChanged(StringHash eventType, VariantMap& eventData)
     Component@ component = cast<Component>(serializable);
     if (component !is null && component.node !is null && component.node.scene is editorScene)
     {
+        node = component.node;
         if (showTemporaryObject)
             UpdateHierarchyItemText(GetComponentListIndex(component), node.enabled);
         else if (!component.temporary && GetComponentListIndex(component) == NO_ITEM)
@@ -1478,6 +1507,22 @@ bool Cut()
     return false;
 }
 
+bool Duplicate()
+{
+    if (CheckHierarchyWindowFocus())
+    {
+        bool ret = true;
+        if (!selectedNodes.empty || !selectedComponents.empty)
+            ret = ret && (selectedNodes.empty || selectedComponents.empty ? SceneDuplicate() : false);   // Node and component is mutually exclusive for copy action
+        // Not mutually exclusive
+        if (!selectedUIElements.empty)
+            ret = ret && UIElementDuplicate();
+        return ret;
+    }
+
+    return false;
+}
+
 bool Copy()
 {
     if (CheckHierarchyWindowFocus())
@@ -1510,6 +1555,23 @@ bool Paste()
     return false;
 }
 
+bool BlenderModeDelete()
+{
+    if (ui.focusElement is null)
+    {
+        Array<UIElement@> actions;
+        actions.Push(CreateContextMenuItem("Delete?", "HandleBlenderModeDelete"));
+        actions.Push(CreateContextMenuItem("Cancel", "HandleEmpty"));
+
+        if (actions.length > 0) 
+        {
+            ActivateContextMenu(actions);
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Delete()
 {
     if (CheckHierarchyWindowFocus())
@@ -1538,6 +1600,18 @@ bool SelectAll()
             return SceneSelectAll();    // If nothing is selected yet, fall back to scene select all
     }
 
+    return false;
+}
+
+bool DeselectAll()
+{
+    if (CheckHierarchyWindowFocus())
+    {
+        BeginSelectionModify();
+        hierarchyList.ClearSelection();
+        EndSelectionModify();
+        return true;
+    }
     return false;
 }
 
@@ -1615,6 +1689,11 @@ void HandleHierarchyContextCreateLocalNode()
     CreateNode(LOCAL);
 }
 
+void HandleHierarchyContextDuplicate()
+{
+    Duplicate();
+}
+
 void HandleHierarchyContextCopy()
 {
     Copy();
@@ -1628,6 +1707,16 @@ void HandleHierarchyContextCut()
 void HandleHierarchyContextDelete()
 {
     Delete();
+}
+
+void HandleBlenderModeDelete() 
+{
+    Delete();
+}
+
+void HandleEmpty() 
+{
+    //just doing nothing
 }
 
 void HandleHierarchyContextPaste()
@@ -1673,4 +1762,33 @@ void HandleHierarchyContextUIElementCloseUILayout()
 void HandleHierarchyContextUIElementCloseAllUILayouts()
 {
     CloseAllUILayouts();
+}
+
+void CollapseHierarchy()
+{
+    Array<uint> oldSelections = hierarchyList.selections;
+    Array<uint> selections = {0};
+
+    hierarchyList.SetSelections(selections);
+
+    for (uint i = 0; i < selections.length; ++i)
+        hierarchyList.Expand(selections[i], false, true);
+
+    // only scene's scope expand by default
+    hierarchyList.Expand(0, true, false);
+    
+    hierarchyList.SetSelections(oldSelections);
+}
+
+void CollapseHierarchy(StringHash eventType, VariantMap& eventData)
+{
+    CollapseHierarchy();
+}
+
+void HandleShowID(StringHash eventType, VariantMap& eventData) 
+{
+    CheckBox@ checkBox = eventData["Element"].GetPtr();
+    showID = checkBox.checked;
+    UpdateHierarchyItem(editorScene, false);
+    CollapseHierarchy();
 }

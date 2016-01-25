@@ -1,2 +1,0 @@
-nvdxt.exe
-pause

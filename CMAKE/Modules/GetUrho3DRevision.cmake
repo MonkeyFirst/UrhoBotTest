@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2008-2014 the Urho3D project.
+# Copyright (c) 2008-2015 the Urho3D project.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -43,11 +43,9 @@ else ()
         string (REGEX MATCH "${VERSION}-([^-]+)" PATCH ${LIB_REVISION})     # Subsequent commits count after a release tag is treated as patch number
         if (PATCH)
             set (VERSION ${VERSION}.${CMAKE_MATCH_1})
-        else ()
-            set (VERSION ${VERSION}.0)
         endif ()
     else ()
-        set (VERSION 0.0.0)
+        set (VERSION 0.0)
     endif ()
     execute_process (COMMAND ${CMAKE_COMMAND} -E echo ${VERSION})
 endif ()

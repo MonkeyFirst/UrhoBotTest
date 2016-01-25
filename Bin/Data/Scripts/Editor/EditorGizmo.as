@@ -84,6 +84,7 @@ void CreateGizmo()
     gizmo.enabled = false;
     gizmo.viewMask = 0x80000000; // Editor raycasts use viewmask 0x7fffffff
     gizmo.occludee = false;
+    gizmoNode.name = "EditorGizmo";
 
     gizmoAxisX.lastSelected = false;
     gizmoAxisY.lastSelected = false;
@@ -181,16 +182,14 @@ void ResizeGizmo()
     if (gizmo is null || !gizmo.enabled)
         return;
 
-    float c = 0.1;
+    float scale = 0.1 / camera.zoom;
 
     if (camera.orthographic)
-        gizmoNode.scale = Vector3(c, c, c);
+        scale *= camera.orthoSize;
     else
-    {
-        /// \todo if matrix classes were exposed to script could simply use the camera's inverse world transform
-        float z = (cameraNode.worldRotation.Inverse() * (gizmoNode.worldPosition - cameraNode.worldPosition)).z;
-        gizmoNode.scale = Vector3(c * z, c * z, c * z);
-    }
+        scale *= (camera.view * gizmoNode.position).z;
+
+    gizmoNode.scale = Vector3(scale, scale, scale);
 }
 
 void CalculateGizmoAxes()

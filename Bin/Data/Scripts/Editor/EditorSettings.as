@@ -1,14 +1,14 @@
 // Urho3D editor settings dialog
-
 bool subscribedToEditorSettings = false;
 Window@ settingsDialog;
+String defaultTags;
 
 void CreateEditorSettingsDialog()
 {
     if (settingsDialog !is null)
         return;
     
-    settingsDialog = ui.LoadLayout(cache.GetResource("XMLFile", "UI/EditorSettingsDialog.xml"));
+    settingsDialog = LoadEditorUI("UI/EditorSettingsDialog.xml");
     ui.root.AddChild(settingsDialog);
     settingsDialog.opacity = uiMaxOpacity;
     settingsDialog.height = 440;
@@ -40,6 +40,18 @@ void UpdateEditorSettingsDialog()
     CheckBox@ mouseWheelCameraPositionToggle = settingsDialog.GetChild("MouseWheelCameraPositionToggle", true);
     mouseWheelCameraPositionToggle.checked = mouseWheelCameraPosition;
 
+    DropDownList@ mouseOrbitEdit = settingsDialog.GetChild("MouseOrbitEdit", true);
+    mouseOrbitEdit.selection = mouseOrbitMode;
+
+    CheckBox@ middleMousePanToggle = settingsDialog.GetChild("MiddleMousePanToggle", true);
+    middleMousePanToggle.checked = mmbPanMode;
+
+    DropDownList@ hotKeysModeEdit = settingsDialog.GetChild("HotKeysModeEdit", true);
+    hotKeysModeEdit.selection = hotKeyMode;
+
+    DropDownList@ newNodeModeEdit = settingsDialog.GetChild("NewNodeModeEdit", true);
+    newNodeModeEdit.selection = newNodeMode;
+
     LineEdit@ distanceEdit = settingsDialog.GetChild("DistanceEdit", true);
     distanceEdit.text = String(newNodeDistance);
 
@@ -70,6 +82,11 @@ void UpdateEditorSettingsDialog()
     DropDownList@ pickModeEdit = settingsDialog.GetChild("PickModeEdit", true);
     pickModeEdit.selection = pickMode;
 
+    LineEdit@ renderPathNameEdit = settingsDialog.GetChild("RenderPathNameEdit", true);
+    renderPathNameEdit.text = renderPathName;
+
+    Button@ pickRenderPathButton = settingsDialog.GetChild("PickRenderPathButton", true);
+
     DropDownList@ textureQualityEdit = settingsDialog.GetChild("TextureQualityEdit", true);
     textureQualityEdit.selection = renderer.textureQuality;
 
@@ -80,7 +97,7 @@ void UpdateEditorSettingsDialog()
     shadowResolutionEdit.selection = GetShadowResolution();
 
     DropDownList@ shadowQualityEdit = settingsDialog.GetChild("ShadowQualityEdit", true);
-    shadowQualityEdit.selection = renderer.shadowQuality;
+    shadowQualityEdit.selection = int(renderer.shadowQuality);
 
     LineEdit@ maxOccluderTrianglesEdit = settingsDialog.GetChild("MaxOccluderTrianglesEdit", true);
     maxOccluderTrianglesEdit.text = String(renderer.maxOccluderTriangles);
@@ -93,6 +110,17 @@ void UpdateEditorSettingsDialog()
 
     CheckBox@ frameLimiterToggle = settingsDialog.GetChild("FrameLimiterToggle", true);
     frameLimiterToggle.checked = engine.maxFps > 0;
+    
+    LineEdit@ cubemapPath = settingsDialog.GetChild("CubeMapGenPath", true);
+    cubemapPath.text = cubeMapGen_Path;
+    LineEdit@ cubemapName = settingsDialog.GetChild("CubeMapGenKey", true);
+    cubemapName.text = cubeMapGen_Name;
+    LineEdit@ cubemapSize = settingsDialog.GetChild("CubeMapGenSize", true);
+    cubemapSize.text = String(cubeMapGen_Size);
+    
+    LineEdit@ defaultTagsEdit = settingsDialog.GetChild("DefaultTagsEdit", true);
+    defaultTagsEdit.text = defaultTags.Trimmed();
+    
 
     if (!subscribedToEditorSettings)
     {
@@ -106,6 +134,10 @@ void UpdateEditorSettingsDialog()
         SubscribeToEvent(speedEdit, "TextFinished", "EditCameraSpeed");
         SubscribeToEvent(limitRotationToggle, "Toggled", "EditLimitRotation");
         SubscribeToEvent(mouseWheelCameraPositionToggle, "Toggled", "EditMouseWheelCameraPosition");
+        SubscribeToEvent(middleMousePanToggle, "Toggled", "EditMiddleMousePan");
+        SubscribeToEvent(mouseOrbitEdit, "ItemSelected", "EditMouseOrbitMode");
+        SubscribeToEvent(hotKeysModeEdit, "ItemSelected", "EditHotKeyMode");
+        SubscribeToEvent(newNodeModeEdit, "ItemSelected", "EditNewNodeMode");
         SubscribeToEvent(distanceEdit, "TextChanged", "EditNewNodeDistance");
         SubscribeToEvent(distanceEdit, "TextFinished", "EditNewNodeDistance");
         SubscribeToEvent(moveStepEdit, "TextChanged", "EditMoveStep");
@@ -122,6 +154,8 @@ void UpdateEditorSettingsDialog()
         SubscribeToEvent(importOptionsEdit, "TextChanged", "EditImportOptions");
         SubscribeToEvent(importOptionsEdit, "TextFinished", "EditImportOptions");
         SubscribeToEvent(pickModeEdit, "ItemSelected", "EditPickMode");
+        SubscribeToEvent(renderPathNameEdit, "TextFinished", "EditRenderPathName");
+        SubscribeToEvent(pickRenderPathButton, "Released", "PickRenderPath");
         SubscribeToEvent(textureQualityEdit, "ItemSelected", "EditTextureQuality");
         SubscribeToEvent(materialQualityEdit, "ItemSelected", "EditMaterialQuality");
         SubscribeToEvent(shadowResolutionEdit, "ItemSelected", "EditShadowResolution");
@@ -132,16 +166,34 @@ void UpdateEditorSettingsDialog()
         SubscribeToEvent(dynamicInstancingToggle, "Toggled", "EditDynamicInstancing");
         SubscribeToEvent(frameLimiterToggle, "Toggled", "EditFrameLimiter");
         SubscribeToEvent(settingsDialog.GetChild("CloseButton", true), "Released", "HideEditorSettingsDialog");
+        
+        SubscribeToEvent(cubemapPath, "TextChanged",  "EditCubemapPath");
+        SubscribeToEvent(cubemapPath, "TextFinished", "EditCubemapPath");
+        SubscribeToEvent(cubemapName, "TextChanged",  "EditCubemapName");
+        SubscribeToEvent(cubemapName, "TextFinished", "EditCubemapName");
+        SubscribeToEvent(cubemapSize, "TextChanged",  "EditCubemapSize");
+        SubscribeToEvent(cubemapSize, "TextFinished", "EditCubemapSize");
+        
+        SubscribeToEvent(defaultTagsEdit, "TextFinished", "EditDefaultTags");
+              
         subscribedToEditorSettings = true;
     }
 }
 
-bool ShowEditorSettingsDialog()
+bool ToggleEditorSettingsDialog()
+{
+    if (settingsDialog.visible == false)
+        ShowEditorSettingsDialog();
+    else
+        HideEditorSettingsDialog();
+    return true;
+}
+
+void ShowEditorSettingsDialog()
 {
     UpdateEditorSettingsDialog();
     settingsDialog.visible = true;
     settingsDialog.BringToFront();
-    return true;
 }
 
 void HideEditorSettingsDialog()
@@ -194,6 +246,31 @@ void EditMouseWheelCameraPosition(StringHash eventType, VariantMap& eventData)
 {
     CheckBox@ edit = eventData["Element"].GetPtr();
     mouseWheelCameraPosition = edit.checked;
+}
+
+void EditMouseOrbitMode(StringHash eventType, VariantMap& eventData)
+{
+    DropDownList@ edit = eventData["Element"].GetPtr();
+    mouseOrbitMode = edit.selection;
+}
+
+void EditMiddleMousePan(StringHash eventType, VariantMap& eventData)
+{
+    mmbPanMode = cast<CheckBox>(eventData["Element"].GetPtr()).checked;
+}
+
+void EditHotKeyMode(StringHash eventType, VariantMap& eventData)
+{
+    DropDownList@ edit = eventData["Element"].GetPtr();
+    hotKeyMode = edit.selection;
+    MessageBox("Please, restart Urho editor for applying changes.\n", " Notify ");
+    
+}
+
+void EditNewNodeMode(StringHash eventType, VariantMap& eventData)
+{
+    DropDownList@ edit = eventData["Element"].GetPtr();
+    newNodeMode = edit.selection;
 }
 
 void EditNewNodeDistance(StringHash eventType, VariantMap& eventData)
@@ -273,6 +350,26 @@ void EditPickMode(StringHash eventType, VariantMap& eventData)
     pickMode = edit.selection;
 }
 
+void EditRenderPathName(StringHash eventType, VariantMap& eventData)
+{
+    LineEdit@ edit = eventData["Element"].GetPtr();
+    SetRenderPath(edit.text);
+}
+
+void PickRenderPath(StringHash eventType, VariantMap& eventData)
+{
+    CreateFileSelector("Load render path", "Load", "Cancel", uiRenderPathPath, uiRenderPathFilters, uiRenderPathFilter);
+    SubscribeToEvent(uiFileSelector, "FileSelected", "HandleLoadRenderPath");
+}
+
+void HandleLoadRenderPath(StringHash eventType, VariantMap& eventData)
+{
+    CloseFileSelector(uiRenderPathFilter, uiRenderPathPath);
+    SetRenderPath(GetResourceNameFromFullName(ExtractFileName(eventData)));
+    LineEdit@ renderPathNameEdit = settingsDialog.GetChild("RenderPathNameEdit", true);
+    renderPathNameEdit.text = renderPathName;
+}
+
 void EditTextureQuality(StringHash eventType, VariantMap& eventData)
 {
     DropDownList@ edit = eventData["Element"].GetPtr();
@@ -294,7 +391,7 @@ void EditShadowResolution(StringHash eventType, VariantMap& eventData)
 void EditShadowQuality(StringHash eventType, VariantMap& eventData)
 {
     DropDownList@ edit = eventData["Element"].GetPtr();
-    renderer.shadowQuality = edit.selection;
+    renderer.shadowQuality = ShadowQuality(edit.selection);
 }
 
 void EditMaxOccluderTriangles(StringHash eventType, VariantMap& eventData)
@@ -321,4 +418,28 @@ void EditFrameLimiter(StringHash eventType, VariantMap& eventData)
 {
     CheckBox@ edit = eventData["Element"].GetPtr();
     engine.maxFps = edit.checked ? 200 : 0;
+}
+
+void EditCubemapPath(StringHash eventType, VariantMap& eventData)
+{
+    LineEdit@ edit = eventData["Element"].GetPtr();
+    cubeMapGen_Path = edit.text;
+}
+
+void EditCubemapName(StringHash eventType, VariantMap& eventData)
+{
+    LineEdit@ edit = eventData["Element"].GetPtr();
+    cubeMapGen_Name = edit.text;
+}
+
+void EditCubemapSize(StringHash eventType, VariantMap& eventData)
+{
+    LineEdit@ edit = eventData["Element"].GetPtr();
+    cubeMapGen_Size = edit.text.ToInt();
+}
+
+void EditDefaultTags(StringHash eventType, VariantMap& eventData)
+{
+    LineEdit@ edit = eventData["Element"].GetPtr();
+    defaultTags = edit.text;
 }

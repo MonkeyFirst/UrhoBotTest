@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2008-2014 the Urho3D project.
+# Copyright (c) 2008-2015 the Urho3D project.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -24,27 +24,80 @@ cmake_minimum_required (VERSION 2.6.3)
 
 if (CMAKE_TOOLCHAIN_FILE)
     # Reference toolchain variable to suppress "unused variable" warning
+    mark_as_advanced (CMAKE_TOOLCHAIN_FILE)
 endif ()
 
-# Target operating system and architecture
+# this one is important
 set (CMAKE_SYSTEM_NAME Windows)
+# this one not so much
 set (CMAKE_SYSTEM_PROCESSOR x86)
 
-# Sanitate the path
-file (TO_CMAKE_PATH "$ENV{MINGW_PREFIX}" MINGW_PREFIX)
-
-# C/C++ compilers
-set (CMAKE_C_COMPILER ${MINGW_PREFIX}-gcc      CACHE PATH "C compiler")
-set (CMAKE_CXX_COMPILER ${MINGW_PREFIX}-g++    CACHE PATH "C++ compiler")
-set (CMAKE_RC_COMPILER ${MINGW_PREFIX}-windres CACHE PATH "RC compiler")
+# specify the cross compiler
+if (NOT MINGW_PREFIX AND DEFINED ENV{MINGW_PREFIX})
+    file (TO_CMAKE_PATH $ENV{MINGW_PREFIX} MINGW_PREFIX)
+endif ()
+if (NOT EXISTS ${MINGW_PREFIX}-gcc)
+    message (FATAL_ERROR "Could not find MinGW cross compilation tool. "
+        "Use MINGW_PREFIX environment variable or build option to specify the location of the toolchain.")
+endif ()
+set (COMPILER_PREFIX ${MINGW_PREFIX})
+if (NOT CMAKE_C_COMPILER AND "$ENV{USE_CCACHE}")
+    get_filename_component (NAME ${MINGW_PREFIX} NAME)
+    execute_process (COMMAND whereis -b ccache COMMAND grep -o \\S*lib\\S* RESULT_VARIABLE EXIT_CODE OUTPUT_VARIABLE CCACHE_SYMLINK ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if (EXIT_CODE EQUAL 0 AND EXISTS ${CCACHE_SYMLINK}/${NAME}-gcc AND EXISTS ${CCACHE_SYMLINK}/${NAME}-g++)
+        set (COMPILER_PREFIX ${CCACHE_SYMLINK}/${NAME})
+    else ()
+        # Most probably this is a custom compiler toolchain not provided by the distro's own repository
+        get_filename_component (PATH ${MINGW_PREFIX} PATH)
+        if (NOT $ENV{PATH} MATCHES ${PATH})
+            message (FATAL_ERROR "The bin directory containing the compiler toolchain (${PATH}) has not been added in the PATH environment variable. "
+                "This is required to enable ccache support for MinGW compiler toolchain.")
+        endif ()
+        execute_process (COMMAND which ccache RESULT_VARIABLE EXIT_CODE OUTPUT_VARIABLE CCACHE ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if (EXIT_CODE EQUAL 0)
+            foreach (suffix gcc g++)
+                execute_process (COMMAND ${CMAKE_COMMAND} -E create_symlink ${CCACHE} ${CMAKE_BINARY_DIR}/${NAME}-${suffix})
+            endforeach ()
+            set (COMPILER_PREFIX ${CMAKE_BINARY_DIR}/${NAME})
+        else ()
+            message (WARNING "ccache may not have been installed on this host system. "
+                "This is required to enable ccache support for MinGW compiler toolchain. CMake has been configured to use the actual compiler toolchain instead of ccache. "
+                "In order to rectify this, the build tree must be regenerated after installing ccache.")
+        endif ()
+    endif ()
+endif ()
+set (CMAKE_C_COMPILER   ${COMPILER_PREFIX}-gcc  CACHE PATH "C compiler")
+set (CMAKE_CXX_COMPILER ${COMPILER_PREFIX}-g++  CACHE PATH "C++ compiler")
+set (CMAKE_STRIP        ${MINGW_PREFIX}-strip   CACHE PATH "strip")
+set (CMAKE_AR           ${MINGW_PREFIX}-ar      CACHE PATH "archive")
+set (CMAKE_LINKER       ${MINGW_PREFIX}-ld      CACHE PATH "linker")
+set (CMAKE_NM           ${MINGW_PREFIX}-nm      CACHE PATH "nm")
+set (CMAKE_OBJCOPY      ${MINGW_PREFIX}-objcopy CACHE PATH "objcopy")
+set (CMAKE_OBJDUMP      ${MINGW_PREFIX}-objdump CACHE PATH "objdump")
+set (CMAKE_RANLIB       ${MINGW_PREFIX}-ranlib  CACHE PATH "ranlib")
+set (CMAKE_RC_COMPILER  ${MINGW_PREFIX}-windres CACHE PATH "RC compiler")
 
 # specify the system root
-file (TO_CMAKE_PATH "$ENV{MINGW_ROOT}" MINGW_ROOT)
-if (NOT MINGW_ROOT)
-    get_filename_component (MINGW_PREFIX ${MINGW_PREFIX} NAME)
-    set (MINGW_ROOT /usr/${MINGW_PREFIX}/sys-root/mingw)
+if (NOT MINGW_SYSROOT)
+    if (DEFINED ENV{MINGW_SYSROOT})
+        file (TO_CMAKE_PATH $ENV{MINGW_SYSROOT} MINGW_SYSROOT)
+    else ()
+        get_filename_component (NAME ${MINGW_PREFIX} NAME)
+        if (EXISTS /usr/${NAME}/sys-root)
+            # Redhat based system
+            set (MINGW_SYSROOT /usr/${NAME}/sys-root/mingw)
+        else ()
+            # Debian based system
+            set (MINGW_SYSROOT /usr/${NAME})
+        endif ()
+    endif ()
+    if (NOT EXISTS ${MINGW_SYSROOT})
+        message (FATAL_ERROR "Could not find MinGW system root. "
+            "Use MINGW_SYSROOT environment variable or build option to specify the location of system root.")
+    endif ()
+    set (MINGW_PREFIX ${MINGW_PREFIX} CACHE STRING "Prefix path to MinGW cross-compiler tools (MinGW cross-compiling build only)" FORCE)
+    set (MINGW_SYSROOT ${MINGW_SYSROOT} CACHE PATH "Path to MinGW system root (MinGW cross-compiling build only)" FORCE)
 endif ()
-set (MINGW_SYSROOT ${MINGW_ROOT} CACHE PATH "Path to MinGW SYSROOT")
 set (CMAKE_FIND_ROOT_PATH ${MINGW_SYSROOT})
 
 # only search libraries and headers in the target directories

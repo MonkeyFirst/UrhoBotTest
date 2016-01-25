@@ -15,6 +15,7 @@ const StringHash TEXT_CHANGED_EVENT_TYPE("TextChanged");
 
 bool inLoadAttributeEditor = false;
 bool inEditAttribute = false;
+bool inUpdateBitSelection = false;
 bool showNonEditableAttribute = false;
 
 Color normalTextColor(1.0f, 1.0f, 1.0f);
@@ -26,6 +27,15 @@ bool rememberResourcePath = true;
 
 // Exceptions for string attributes that should not be continuously edited
 Array<String> noTextChangedAttrs = {"Script File", "Class Name", "Script Object Type", "Script File Name"};
+
+// List of attributes that should be created with a bit selection editor
+const Array<String> bitSelectionAttrs = {"Collision Mask", "Collision Layer", "Light Mask", "Zone Mask", "View Mask", "Shadow Mask"};
+
+// Number of editable bits for bit selection editor
+const int MAX_BITMASK_BITS = 8;
+const int MAX_BITMASK_VALUE = (1 << MAX_BITMASK_BITS) - 1;
+Color nonEditableBitSelectorColor(0.5f, 0.5f, 0.5f);
+Color editableBitSelectorColor(1.0f, 1.0f, 1.0f);
 
 WeakHandle testAnimState;
 
@@ -132,6 +142,103 @@ LineEdit@ CreateAttributeLineEdit(UIElement@ parent, Array<Serializable@>@ seria
     return attrEdit;
 }
 
+LineEdit@ CreateAttributeBitSelector(UIElement@ parent, Array<Serializable@>@ serializables, uint index, uint subIndex)
+{
+    UIElement@ container = UIElement();
+    parent.AddChild(container);
+    parent.SetFixedHeight(38);
+    container.SetFixedWidth(16 * 4 + 4);
+
+    for (int i = 0; i < 2; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            CheckBox@ bitBox = CheckBox();
+            bitBox.name = "BitSelect_" + String(i * 4 + j);
+            container.AddChild(bitBox);
+            bitBox.position = IntVector2(16 * j, 16 * i);
+            bitBox.style = "CheckBox";
+            bitBox.SetFixedHeight(16);
+
+            SubscribeToEvent(bitBox,"Toggled", "HandleBitSelectionToggled");
+        }
+    }
+
+    LineEdit@ attrEdit = CreateAttributeLineEdit(parent, serializables, index, subIndex);
+    attrEdit.name = "LineEdit";
+    SubscribeToEvent(attrEdit, "TextChanged", "HandleBitSelectionEdit");
+    SubscribeToEvent(attrEdit, "TextFinished", "HandleBitSelectionEdit");
+    return attrEdit;
+}
+
+void UpdateBitSelection(UIElement@ parent)
+{
+    int mask = 0;
+    for (int i = 0; i < MAX_BITMASK_BITS; i++)
+    {
+        CheckBox@ bitBox = parent.GetChild("BitSelect_" + String(i), true);
+        mask = mask | (bitBox.checked ? 1 << i : 0);
+    }
+
+    if (mask == MAX_BITMASK_VALUE)
+        mask = -1;
+
+    inUpdateBitSelection = true;
+    LineEdit@ attrEdit = parent.parent.GetChild("LineEdit", true);
+    attrEdit.text = String(mask);
+    inUpdateBitSelection = false;
+}
+
+void SetBitSelection(UIElement@ parent, int value)
+{
+    int mask = value;
+    bool enabled = true;
+
+    if (mask ==  -1)
+        mask = MAX_BITMASK_VALUE;
+    else if (mask > MAX_BITMASK_VALUE)
+        enabled = false;
+
+    for (int i = 0; i < MAX_BITMASK_BITS; i++)
+    {
+        CheckBox@ bitBox = parent.GetChild("BitSelect_" + String(i), true);
+        bitBox.enabled = enabled;
+        if (!enabled)
+            bitBox.color = nonEditableBitSelectorColor;
+        else
+            bitBox.color = editableBitSelectorColor;
+
+        if ((1 << i) & mask != 0)
+            bitBox.checked = true;
+        else
+            bitBox.checked = false;
+    }
+}
+
+void HandleBitSelectionToggled(StringHash eventType, VariantMap& eventData)
+{
+    if (inUpdateBitSelection)
+        return;
+
+    CheckBox@ bitBox = eventData["Element"].GetPtr();
+
+    UpdateBitSelection(bitBox.parent);
+}
+
+void HandleBitSelectionEdit(StringHash eventType, VariantMap& eventData)
+{
+    if (!inUpdateBitSelection)
+    {
+        LineEdit@ attrEdit = eventData["Element"].GetPtr();
+
+        inUpdateBitSelection = true;
+        SetBitSelection(attrEdit.parent, attrEdit.text.ToInt());
+        inUpdateBitSelection = false;
+    }
+
+    EditAttribute(eventType, eventData);
+}
+
 UIElement@ CreateStringAttributeEditor(ListView@ list, Array<Serializable@>@ serializables, const AttributeInfo&in info, uint index, uint subIndex)
 {
     UIElement@ parent = CreateAttributeEditorParent(list, info.name, index, subIndex);
@@ -169,19 +276,19 @@ UIElement@ CreateNumAttributeEditor(ListView@ list, Array<Serializable@>@ serial
 {
     UIElement@ parent = CreateAttributeEditorParent(list, info.name, index, subIndex);
     VariantType type = info.type;
-    uint numCoords = type - VAR_FLOAT + 1;
-    if (type == VAR_QUATERNION)
-        numCoords = 3;
-    else if (type == VAR_COLOR || type == VAR_INTRECT)
-        numCoords = 4;
-    else if (type == VAR_INTVECTOR2)
+    uint numCoords = 1;
+    if (type == VAR_VECTOR2 || type == VAR_INTVECTOR2)
         numCoords = 2;
+    if (type == VAR_VECTOR3 || type == VAR_QUATERNION)
+        numCoords = 3;
+    else if (type == VAR_VECTOR4 || type == VAR_COLOR || type == VAR_INTRECT)
+        numCoords = 4;
 
     for (uint i = 0; i < numCoords; ++i)
     {
         LineEdit@ attrEdit = CreateAttributeLineEdit(parent, serializables, index, subIndex);
         attrEdit.vars["Coordinate"] = i;
-        
+
         CreateDragSlider(attrEdit);
 
         SubscribeToEvent(attrEdit, "TextChanged", "EditAttribute");
@@ -194,13 +301,21 @@ UIElement@ CreateNumAttributeEditor(ListView@ list, Array<Serializable@>@ serial
 UIElement@ CreateIntAttributeEditor(ListView@ list, Array<Serializable@>@ serializables, const AttributeInfo&in info, uint index, uint subIndex)
 {
     UIElement@ parent = CreateAttributeEditorParent(list, info.name, index, subIndex);
+
+    // Check for masks and layers
+    if (bitSelectionAttrs.Find(info.name) > -1)
+    {
+        LineEdit@ attrEdit = CreateAttributeBitSelector(parent, serializables, index, subIndex);
+    }
     // Check for enums
-    if (info.enumNames is null || info.enumNames.empty)
+    else if (info.enumNames is null || info.enumNames.empty)
     {
         // No enums, create a numeric editor
         LineEdit@ attrEdit = CreateAttributeLineEdit(parent, serializables, index, subIndex);
         CreateDragSlider(attrEdit);
-        SubscribeToEvent(attrEdit, "TextChanged", "EditAttribute");
+        // If the attribute is a counter for things like billboards or animation states, disable apply at each change
+        if (info.name.Find(" Count", 0, false) == -1)
+            SubscribeToEvent(attrEdit, "TextChanged", "EditAttribute");
         SubscribeToEvent(attrEdit, "TextFinished", "EditAttribute");
         // If the attribute is a node ID, make it a drag/drop target
         if (info.name.Contains("NodeID", false) || info.name.Contains("Node ID", false) || (info.mode & AM_NODEID) != 0)
@@ -264,22 +379,22 @@ UIElement@ CreateResourceRefAttributeEditor(ListView@ list, Array<Serializable@>
     {
         if ((picker.actions & ACTION_PICK) != 0)
         {
-            Button@ pickButton = CreateResourcePickerButton(container, serializables, index, subIndex, "Pick");
+            Button@ pickButton = CreateResourcePickerButton(container, serializables, index, subIndex, "smallButtonPick");
             SubscribeToEvent(pickButton, "Released", "PickResource");
         }
         if ((picker.actions & ACTION_OPEN) != 0)
         {
-            Button@ openButton = CreateResourcePickerButton(container, serializables, index, subIndex, "Open");
+            Button@ openButton = CreateResourcePickerButton(container, serializables, index, subIndex, "smallButtonOpen");
             SubscribeToEvent(openButton, "Released", "OpenResource");
         }
         if ((picker.actions & ACTION_EDIT) != 0)
         {
-            Button@ editButton = CreateResourcePickerButton(container, serializables, index, subIndex, "Edit");
+            Button@ editButton = CreateResourcePickerButton(container, serializables, index, subIndex, "smallButtonEdit");
             SubscribeToEvent(editButton, "Released", "EditResource");
         }
         if ((picker.actions & ACTION_TEST) != 0)
         {
-            Button@ testButton = CreateResourcePickerButton(container, serializables, index, subIndex, "Test");
+            Button@ testButton = CreateResourcePickerButton(container, serializables, index, subIndex, "smallButtonTest");
             SubscribeToEvent(testButton, "Released", "TestResource");
         }
     }
@@ -302,9 +417,14 @@ Button@ CreateResourcePickerButton(UIElement@ container, Array<Serializable@>@ s
     buttonText.style = "EditorAttributeText";
     buttonText.SetAlignment(HA_CENTER, VA_CENTER);
     buttonText.text = text;
+    buttonText.autoLocalizable = true;
 
     return button;
 }
+
+// Use internally for nested variant vector
+uint nestedSubIndex;
+Array<Variant>@ nestedVector;
 
 UIElement@ CreateAttributeEditor(ListView@ list, Array<Serializable@>@ serializables, const AttributeInfo&in info, uint index, uint subIndex, bool suppressedSeparatedLabel = false)
 {
@@ -315,7 +435,7 @@ UIElement@ CreateAttributeEditor(ListView@ list, Array<Serializable@>@ serializa
         parent = CreateStringAttributeEditor(list, serializables, info, index, subIndex);
     else if (type == VAR_BOOL)
         parent = CreateBoolAttributeEditor(list, serializables, info, index, subIndex);
-    else if ((type >= VAR_FLOAT && type <= VAR_VECTOR4) || type == VAR_QUATERNION || type == VAR_COLOR || type == VAR_INTVECTOR2 || type == VAR_INTRECT)
+    else if ((type >= VAR_FLOAT && type <= VAR_VECTOR4) || type == VAR_QUATERNION || type == VAR_COLOR || type == VAR_INTVECTOR2 || type == VAR_INTRECT || type == VAR_DOUBLE)
         parent = CreateNumAttributeEditor(list, serializables, info, index, subIndex);
     else if (type == VAR_INT)
         parent = CreateIntAttributeEditor(list, serializables, info, index, subIndex);
@@ -335,22 +455,61 @@ UIElement@ CreateAttributeEditor(ListView@ list, Array<Serializable@>@ serializa
     }
     else if (type == VAR_VARIANTVECTOR)
     {
-        VectorStruct@ vectorStruct = GetVectorStruct(serializables, index);
+        uint nameIndex = 0;
+        uint repeat = M_MAX_UNSIGNED;
+
+        VectorStruct@ vectorStruct;
+        Array<Variant>@ vector;
+        bool emptyNestedVector = false;
+        if (info.name.Contains('>'))
+        {
+            @vector = @nestedVector;
+            vectorStruct = GetNestedVectorStruct(serializables, info.name);
+            repeat = vector[subIndex].GetUInt();    // Nested VariantVector must have a predefined repeat count at the start of the vector
+            emptyNestedVector = repeat == 0;
+        }
+        else
+        {
+            @vector = serializables[0].attributes[index].GetVariantVector();
+            vectorStruct = GetVectorStruct(serializables, index);
+            subIndex = 0;
+        }
         if (vectorStruct is null)
             return null;
-        uint nameIndex = 0;
 
-        Array<Variant>@ vector = serializables[0].attributes[index].GetVariantVector();
-        for (uint i = 0; i < vector.length; ++i)
+        for (uint i = subIndex; i < vector.length; ++i)
         {
             // The individual variant in the vector is not an attribute of the serializable, the structure is reused for convenience
             AttributeInfo vectorInfo;
-            vectorInfo.name = vectorStruct.variableNames[nameIndex];
-            vectorInfo.type = vector[i].type;
+            vectorInfo.name = vectorStruct.variableNames[nameIndex++];
+            bool nested = vectorInfo.name.Contains('>');
+            if (nested)
+            {
+                vectorInfo.type = VAR_VARIANTVECTOR;
+                @nestedVector = @vector;
+            }
+            else
+                vectorInfo.type = vector[i].type;
             CreateAttributeEditor(list, serializables, vectorInfo, index, i);
-            ++nameIndex;
+            if (nested)
+            {
+                i = nestedSubIndex;
+                @nestedVector = null;
+            }
+            if (emptyNestedVector)
+            {
+                nestedSubIndex = i;
+                break;
+            }
             if (nameIndex >= vectorStruct.variableNames.length)
+            {
+                if (--repeat == 0)
+                {
+                    nestedSubIndex = i;
+                    break;
+                }
                 nameIndex = vectorStruct.restartIndex;
+            }
         }
     }
     else if (type == VAR_VARIANTMAP)
@@ -359,7 +518,15 @@ UIElement@ CreateAttributeEditor(ListView@ list, Array<Serializable@>@ serializa
         Array<StringHash>@ keys = map.keys;
         for (uint i = 0; i < keys.length; ++i)
         {
-            String varName = GetVariableName(keys[i]);
+            String varName = GetVarName(keys[i]);
+            if (varName.empty)
+            {
+                // UIElements will contain internal vars, which do not have known mappings. Skip these
+                if (cast<UIElement>(serializables[0]) !is null)
+                    continue;
+                // Else, for scene nodes, show as hexadecimal hashes if nothing else is available
+                varName = keys[i].ToString();
+            }
             Variant value = map[keys[i]];
 
             // The individual variant in the map is not an attribute of the serializable, the structure is reused for convenience
@@ -473,13 +640,15 @@ void LoadAttributeEditor(UIElement@ parent, const Variant&in value, const Attrib
     }
 
     VariantType type = info.type;
-    if (type == VAR_FLOAT || type == VAR_STRING || type == VAR_BUFFER)
+    if (type == VAR_FLOAT || type == VAR_DOUBLE || type == VAR_STRING || type == VAR_BUFFER)
         SetEditable(SetValue(parent.children[1], value.ToString(), sameValue), editable && sameValue);
     else if (type == VAR_BOOL)
         SetEditable(SetValue(parent.children[1], value.GetBool(), sameValue), editable && sameValue);
     else if (type == VAR_INT)
     {
-        if (info.enumNames is null || info.enumNames.empty)
+        if (bitSelectionAttrs.Find(info.name) > -1)
+            SetEditable(SetValue(parent.GetChild("LineEdit", true), value.ToString(), sameValue), editable && sameValue);
+        else if (info.enumNames is null || info.enumNames.empty)
             SetEditable(SetValue(parent.children[1], value.ToString(), sameValue), editable && sameValue);
         else
             SetEditable(SetValue(parent.children[1], value.GetInt(), sameValue), editable && sameValue);
@@ -533,7 +702,7 @@ void LoadAttributeEditor(UIElement@ parent, const Variant&in value, const Attrib
             bool sameValue = true;
             Array<Variant> varValues;
 
-            // Reevaluate aach variant in the vector
+            // Reevaluate each variant in the vector
             for (uint i = 0; i < values.length; ++i)
             {
                 Array<Variant>@ vector = values[i].GetVariantVector();
@@ -565,9 +734,9 @@ void LoadAttributeEditor(UIElement@ parent, const Variant&in value, const Attrib
             if (parent is null)
                 break;
 
-            String varName = GetVariableName(keys[subIndex]);
+            String varName = GetVarName(keys[subIndex]);
             if (varName.empty)
-                continue;
+                varName = keys[subIndex].ToString(); // Use hexadecimal if nothing else is available
 
             Variant firstValue = map[keys[subIndex]];
             bool sameValue = true;
@@ -693,11 +862,17 @@ void SanitizeNumericalValue(VariantType type, String& value)
         value = String(value.ToFloat());
     else if (type == VAR_INT || type == VAR_INTRECT || type == VAR_INTVECTOR2)
         value = String(value.ToInt());
+    else if (type == VAR_DOUBLE)
+        value = String(value.ToDouble());
 }
 
 void GetEditorValue(UIElement@ parent, VariantType type, Array<String>@ enumNames, uint coordinate, Array<Variant>& values)
 {
     LineEdit@ attrEdit = parent.children[coordinate + 1];
+
+    if (attrEdit is null)
+        attrEdit = parent.GetChild("LineEdit", true);
+
     if (type == VAR_STRING)
         FillValue(values, Variant(attrEdit.text.Trimmed()));
     else if (type == VAR_BOOL)
@@ -707,6 +882,8 @@ void GetEditorValue(UIElement@ parent, VariantType type, Array<String>@ enumName
     }
     else if (type == VAR_FLOAT)
         FillValue(values, Variant(attrEdit.text.ToFloat()));
+    else if (type == VAR_DOUBLE)
+        FillValue(values, Variant(attrEdit.text.ToDouble()));
     else if (type == VAR_QUATERNION)
     {
         float value = attrEdit.text.ToFloat();
@@ -795,6 +972,16 @@ void UpdateAttributes(Array<Serializable@>@ serializables, ListView@ list, bool&
         list.viewPosition = oldViewPos;
 }
 
+void EditScriptAttributes(Component@ component, uint index)
+{
+    if (component !is null && component.typeName.Contains("ScriptInstance"))
+    {
+        String hash = GetComponentAttributeHash(component, index);
+        if (!hash.empty)
+            scriptAttributes[hash] = component.attributes[index];
+    }
+}
+
 void CreateDragSlider(LineEdit@ parent)
 {
     Button@ dragSld = Button();
@@ -802,10 +989,13 @@ void CreateDragSlider(LineEdit@ parent)
     dragSld.SetFixedHeight(ATTR_HEIGHT - 3);
     dragSld.SetFixedWidth(dragSld.height);
     dragSld.SetAlignment(HA_RIGHT, VA_TOP);
+    dragSld.focusMode = FM_NOTFOCUSABLE;
     parent.AddChild(dragSld);
 
     SubscribeToEvent(dragSld, "DragBegin", "LineDragBegin");
     SubscribeToEvent(dragSld, "DragMove", "LineDragMove");
+    SubscribeToEvent(dragSld, "DragEnd", "LineDragEnd");
+    SubscribeToEvent(dragSld, "DragCancel", "LineDragCancel");
 }
 
 void EditAttribute(StringHash eventType, VariantMap& eventData)
@@ -832,30 +1022,33 @@ void EditAttribute(StringHash eventType, VariantMap& eventData)
     inEditAttribute = true;
 
     Array<Variant> oldValues;
+
     if (!dragEditAttribute)
     {
-	    // Store old values so that PostEditAttribute can create undo actions
-	    for (uint i = 0; i < serializables.length; ++i)
-		    oldValues.Push(serializables[i].attributes[index]);
+        // Store old values so that PostEditAttribute can create undo actions
+        for (uint i = 0; i < serializables.length; ++i)
+            oldValues.Push(serializables[i].attributes[index]);
     }
 
     StoreAttributeEditor(parent, serializables, index, subIndex, coordinate);
     for (uint i = 0; i < serializables.length; ++i)
-	    serializables[i].ApplyAttributes();
+        serializables[i].ApplyAttributes();
 
-    //disable undo 
     if (!dragEditAttribute)
     {
-	    // Do the editor post logic after attribute has been modified.
-	    PostEditAttribute(serializables, index, oldValues);
+        // Do the editor post logic after attribute has been modified.
+        PostEditAttribute(serializables, index, oldValues);
     }
+
+    // Update the stored script attributes if this is a ScriptInstance
+    EditScriptAttributes(serializables[0], index);
 
     inEditAttribute = false;
 
     // If not an intermediate edit, reload the editor fields with validated values
     // (attributes may have interactions; therefore we load everything, not just the value being edited)
     if (!intermediateEdit)
-	    attributesDirty = true;
+        attributesDirty = true;
 }
 
 void LineDragBegin(StringHash eventType, VariantMap& eventData)
@@ -863,33 +1056,73 @@ void LineDragBegin(StringHash eventType, VariantMap& eventData)
     UIElement@ label = eventData["Element"].GetPtr();
     int x = eventData["X"].GetInt();
     label.vars["posX"] = x;
-    
-    //store value old value before dragging 
+
+    // Store the old value before dragging
     dragEditAttribute = false;
     LineEdit@ selectedNumEditor = label.parent;
-    //not convenient way to trigger EditAttribute event
-    selectedNumEditor.text = selectedNumEditor.text;
+
+    selectedNumEditor.vars["DragBeginValue"] = selectedNumEditor.text;
+    selectedNumEditor.cursorPosition = 0;
+
+    // Set mouse mode to user preference
+    SetMouseMode(true);
 }
-
-
 
 void LineDragMove(StringHash eventTypem, VariantMap& eventData)
 {
     UIElement@ label = eventData["Element"].GetPtr();
     LineEdit@ selectedNumEditor = label.parent;
-    
+
+    // Prevent undo
+    dragEditAttribute = true;
+
     int x = eventData["X"].GetInt();
     int posx = label.vars["posX"].GetInt();
-    float val = x - posx;
-    
-    float fieldVal = selectedNumEditor.text.ToFloat(); 
+    float val = input.mouseMoveX;
+
+    float fieldVal = selectedNumEditor.text.ToFloat();
     fieldVal += val/100;
     label.vars["posX"] = x;
     selectedNumEditor.text = fieldVal;
-    //disable storing undo 
-    dragEditAttribute = true;
+    selectedNumEditor.cursorPosition = 0;
 }
 
+void LineDragEnd(StringHash eventType, VariantMap& eventData)
+{
+    UIElement@ label = eventData["Element"].GetPtr();
+    LineEdit@ selectedNumEditor = label.parent;
+
+    // Prepare the attributes to store an undo with:
+    // - old value = drag begin value
+    // - new value = final value
+
+    String finalValue = selectedNumEditor.text;
+    // Reset attribute to begin value, and prevent undo
+    dragEditAttribute = true;
+    selectedNumEditor.text = selectedNumEditor.vars["DragBeginValue"].GetString();
+
+    // Store final value, allow undo
+    dragEditAttribute = false;
+    selectedNumEditor.text = finalValue;
+    selectedNumEditor.cursorPosition = 0;
+
+    // Revert mouse to normal behaviour
+    SetMouseMode(false);
+}
+
+void LineDragCancel(StringHash eventType, VariantMap& eventData)
+{
+    UIElement@ label = eventData["Element"].GetPtr();
+
+    // Reset value to what it was when drag edit began, preventing undo.
+    dragEditAttribute = true;
+    LineEdit@ selectedNumEditor = label.parent;
+    selectedNumEditor.text = selectedNumEditor.vars["DragBeginValue"].GetString();
+    selectedNumEditor.cursorPosition = 0;
+
+    // Revert mouse to normal behaviour
+    SetMouseMode(false);
+}
 
 // Resource picker functionality
 const uint ACTION_PICK = 1;
@@ -936,13 +1169,13 @@ ResourcePicker@ resourcePicker = null;
 void InitResourcePicker()
 {
     // Fill resource picker data
-    Array<String> fontFilters = {"*.ttf", "*.otf", "*.fnt", "*.xml"};
+    Array<String> fontFilters = {"*.ttf", "*.otf", "*.fnt", "*.xml", "*.sdf"};
     Array<String> imageFilters = {"*.png", "*.jpg", "*.bmp", "*.tga"};
     Array<String> luaFileFilters = {"*.lua", "*.luc"};
     Array<String> scriptFilters = {"*.as", "*.asc"};
     Array<String> soundFilters = {"*.wav","*.ogg"};
     Array<String> textureFilters = {"*.dds", "*.png", "*.jpg", "*.bmp", "*.tga", "*.ktx", "*.pvr"};
-    Array<String> materialFilters = {"*.xml", "*.material"};
+    Array<String> materialFilters = {"*.xml", "*.material", "*.json"};
     Array<String> anmSetFilters = {"*.scml"};
     Array<String> pexFilters = {"*.pex"};
     Array<String> tmxFilters = {"*.tmx"};
@@ -952,7 +1185,7 @@ void InitResourcePicker()
     resourcePickers.Push(ResourcePicker("LuaFile", luaFileFilters));
     resourcePickers.Push(ResourcePicker("Material", materialFilters, ACTION_PICK | ACTION_OPEN | ACTION_EDIT));
     resourcePickers.Push(ResourcePicker("Model", "*.mdl", ACTION_PICK));
-    resourcePickers.Push(ResourcePicker("ParticleEffect", "*.xml", ACTION_PICK | ACTION_OPEN));
+    resourcePickers.Push(ResourcePicker("ParticleEffect", "*.xml", ACTION_PICK | ACTION_OPEN | ACTION_EDIT));
     resourcePickers.Push(ResourcePicker("ScriptFile", scriptFilters));
     resourcePickers.Push(ResourcePicker("Sound", soundFilters));
     resourcePickers.Push(ResourcePicker("Technique", "*.xml"));
@@ -960,6 +1193,7 @@ void InitResourcePicker()
     resourcePickers.Push(ResourcePicker("TextureCube", "*.xml"));
     resourcePickers.Push(ResourcePicker("Texture3D", "*.xml"));
     resourcePickers.Push(ResourcePicker("XMLFile", "*.xml"));
+    resourcePickers.Push(ResourcePicker("JSONFile", "*.json"));
     resourcePickers.Push(ResourcePicker("Sprite2D", textureFilters, ACTION_PICK | ACTION_OPEN));
     resourcePickers.Push(ResourcePicker("AnimationSet2D", anmSetFilters, ACTION_PICK | ACTION_OPEN));
     resourcePickers.Push(ResourcePicker("ParticleEffect2D", pexFilters, ACTION_PICK | ACTION_OPEN));
@@ -1008,7 +1242,7 @@ void PickResource(StringHash eventType, VariantMap& eventData)
     String lastPath = resourcePicker.lastPath;
     if (lastPath.empty)
         lastPath = sceneResourcePath;
-    CreateFileSelector("Pick " + resourcePicker.typeName, "OK", "Cancel", lastPath, resourcePicker.filters, resourcePicker.lastFilter);
+    CreateFileSelector(localization.Get("Pick ") + resourcePicker.typeName, "OK", "Cancel", lastPath, resourcePicker.filters, resourcePicker.lastFilter, false);
     SubscribeToEvent(uiFileSelector, "FileSelected", "PickResourceDone");
 }
 
@@ -1074,6 +1308,8 @@ void PickResourceDone(StringHash eventType, VariantMap& eventData)
             target.attributes[resourcePickIndex] = Variant(attrs);
             target.ApplyAttributes();
         }
+
+        EditScriptAttributes(target, resourcePickIndex);
     }
 
     PostEditAttribute(resourceTargets, resourcePickIndex, oldValues);
@@ -1129,7 +1365,7 @@ String GetResourceNameFromFullName(const String&in resourceName)
             continue;
         return resourceName.Substring(resourceDirs[i].length);
     }
-    
+
     return ""; // Not found
 }
 
@@ -1176,6 +1412,8 @@ void EditResource(StringHash eventType, VariantMap& eventData)
         // For now only Materials can be edited
         if (resource.typeName == "Material")
             EditMaterial(cast<Material>(resource));
+        else if (resource.typeName == "ParticleEffect")
+            EditParticleEffect(cast<ParticleEffect>(resource));
     }
 }
 
@@ -1185,7 +1423,7 @@ void TestResource(StringHash eventType, VariantMap& eventData)
     LineEdit@ attrEdit = button.parent.children[0];
 
     StringHash resourceType(attrEdit.vars[TYPE_VAR].GetUInt());
-    
+
     // For now only Animations can be tested
     StringHash animType("Animation");
     if (resourceType == animType)
@@ -1274,6 +1512,7 @@ void InitVectorStructs()
         "   UV Coordinates",
         "   Color",
         "   Rotation",
+        "   Direction",
         "   Is Enabled"
     };
     vectorStructs.Push(VectorStruct("BillboardSet", "Billboards", billboardVariables, 1));
@@ -1300,6 +1539,35 @@ void InitVectorStructs()
         "   NodeID"
     };
     vectorStructs.Push(VectorStruct("SplinePath", "Control Points", splinePathInstanceVariables, 1));
+
+    Array<String> crowdManagerFilterTypeVariables = {
+        "Query Filter Type Count",
+        "   Include Flags",
+        "   Exclude Flags",
+        "   >AreaCost"
+    };
+    vectorStructs.Push(VectorStruct("CrowdManager", "Filter Types", crowdManagerFilterTypeVariables, 1));
+
+    Array<String> crowdManagerAreaCostVariables = {
+        "   Area Count",
+        "      Cost"
+    };
+    vectorStructs.Push(VectorStruct("CrowdManager", "   >AreaCost", crowdManagerAreaCostVariables, 1));
+
+    Array<String> crowdManagerObstacleAvoidanceTypeVariables = {
+        "Obstacle Avoid. Type Count",
+        "   Velocity Bias",
+        "   Desired Velocity Weight",
+        "   Current Velocity Weight",
+        "   Side Bias Weight",
+        "   Time of Impact Weight",
+        "   Time Horizon",
+        "   Grid Size",
+        "   Adaptive Divs",
+        "   Adaptive Rings",
+        "   Adaptive Depth"
+    };
+    vectorStructs.Push(VectorStruct("CrowdManager", "Obstacle Avoidance Types", crowdManagerObstacleAvoidanceTypeVariables, 1));
 }
 
 VectorStruct@ GetVectorStruct(Array<Serializable@>@ serializables, uint index)
@@ -1313,6 +1581,16 @@ VectorStruct@ GetVectorStruct(Array<Serializable@>@ serializables, uint index)
     return null;
 }
 
+VectorStruct@ GetNestedVectorStruct(Array<Serializable@>@ serializables, const String&in name)
+{
+    for (uint i = 0; i < vectorStructs.length; ++i)
+    {
+        if (vectorStructs[i].componentTypeName == serializables[0].typeName && vectorStructs[i].attributeName == name)
+            return vectorStructs[i];
+    }
+    return null;
+}
+
 int GetAttributeIndex(Serializable@ serializable, const String&in attrName)
 {
     for (uint i = 0; i < serializable.numAttributes; ++i)
@@ -1320,6 +1598,6 @@ int GetAttributeIndex(Serializable@ serializable, const String&in attrName)
         if (serializable.attributeInfos[i].name.Compare(attrName, false) == 0)
             return i;
     }
-    
+
     return -1;
 }
