@@ -14,6 +14,96 @@ class EditActionGroup
     Array<EditAction@> actions;
 }
 
+class CreateDrawableMaskAction : EditAction
+{
+    uint nodeID;
+    uint drawableID;
+    int oldMask;
+    int redoMask;
+    int typeMask;
+
+    void Define(Drawable@ drawable, int editMaskType)
+    {
+        drawableID = drawable.id;
+        nodeID = drawable.node.id;
+        
+        switch (editMaskType) 
+        {
+            case EDIT_VIEW_MASK:
+                oldMask = drawable.viewMask;
+                break;
+            case EDIT_LIGHT_MASK:
+                oldMask = drawable.lightMask;
+                break;
+            case EDIT_SHADOW_MASK:
+                oldMask = drawable.shadowMask;
+                break;
+            case EDIT_ZONE_MASK:
+                oldMask = drawable.zoneMask;
+                break;
+        } 
+                
+        typeMask = editMaskType;
+        redoMask = oldMask;
+    }
+
+    void Undo()
+    {
+        Node@ node = editorScene.GetNode(nodeID);
+        Drawable@ drawable = editorScene.GetComponent(drawableID);
+        if (node !is null && drawable !is null)
+        {
+            switch (typeMask) 
+            {
+            case EDIT_VIEW_MASK:
+                redoMask = drawable.viewMask;
+                drawable.viewMask = oldMask;
+                break;
+            case EDIT_LIGHT_MASK:
+                redoMask = drawable.lightMask;
+                drawable.lightMask = oldMask;
+                break;
+            case EDIT_SHADOW_MASK:
+                redoMask = drawable.shadowMask;
+                drawable.shadowMask = oldMask;
+                break;
+            case EDIT_ZONE_MASK:
+                redoMask = drawable.zoneMask;
+                drawable.zoneMask = oldMask;
+                break;
+            }
+        }
+    }
+
+    void Redo()
+    {
+        Node@ node = editorScene.GetNode(nodeID);
+        Drawable@ drawable = editorScene.GetComponent(drawableID);
+        if (node !is null && drawable !is null)
+        {
+            switch (typeMask) 
+            {
+            case EDIT_VIEW_MASK:
+                oldMask = drawable.viewMask;
+                drawable.viewMask = redoMask;
+                break;
+            case EDIT_LIGHT_MASK:
+                oldMask = drawable.lightMask;
+                drawable.lightMask = redoMask;
+                break;
+            case EDIT_SHADOW_MASK:
+                oldMask = drawable.shadowMask;
+                drawable.shadowMask = redoMask;
+                break;
+            case EDIT_ZONE_MASK:
+                oldMask = drawable.zoneMask;
+                drawable.zoneMask = redoMask;
+                break;
+            }
+        }
+    }
+}
+
 class CreateNodeAction : EditAction
 {
     uint nodeID;
@@ -320,6 +410,8 @@ class EditAttributeAction : EditAction
                 SetUIElementModified(target);
             else
                 SetSceneModified();
+                
+            EditScriptAttributes(target, attrIndex);
         }
     }
 
@@ -339,6 +431,8 @@ class EditAttributeAction : EditAction
                 SetUIElementModified(target);
             else
                 SetSceneModified();
+                
+            EditScriptAttributes(target, attrIndex);
         }
     }
 }
@@ -366,7 +460,7 @@ class ResetAttributesAction : EditAction
             for (uint i = 0; i < keys.length; ++i)
             {
                 // If variable name is empty (or unregistered) then it is an internal variable and should be preserved
-                String name = GetVariableName(keys[i]);
+                String name = GetVarName(keys[i]);
                 if (name.empty)
                     internalVars[keys[i]] = element.vars[keys[i]];
             }
@@ -754,13 +848,13 @@ class EditMaterialAction : EditAction
     XMLFile@ oldState;
     XMLFile@ newState;
     WeakHandle material;
-    
+
     void Define(Material@ material_, XMLFile@ oldState_)
     {
         material = material_;
         oldState = oldState_;
         newState = XMLFile();
-        
+
         XMLElement materialElem = newState.CreateRoot("material");
         material_.Save(materialElem);
     }
@@ -782,6 +876,47 @@ class EditMaterialAction : EditAction
         {
             mat.Load(newState.root);
             RefreshMaterialEditor();
+        }
+    }
+}
+
+class EditParticleEffectAction : EditAction
+{
+    XMLFile@ oldState;
+    XMLFile@ newState;
+    WeakHandle particleEffect;
+    ParticleEmitter@ particleEmitter;
+
+    void Define(ParticleEmitter@ particleEmitter_, ParticleEffect@ particleEffect_, XMLFile@ oldState_)
+    {
+        particleEmitter = particleEmitter_;
+        particleEffect = particleEffect_;
+        oldState = oldState_;
+        newState = XMLFile();
+
+        XMLElement particleElem = newState.CreateRoot("particleeffect");
+        particleEffect_.Save(particleElem);
+    }
+
+    void Undo()
+    {
+        ParticleEffect@ effect = particleEffect.Get();
+        if (effect !is null)
+        {
+            effect.Load(oldState.root);
+            particleEmitter.ApplyEffect();
+            RefreshParticleEffectEditor();
+        }
+    }
+
+    void Redo()
+    {
+        ParticleEffect@ effect = particleEffect.Get();
+        if (effect !is null)
+        {
+            effect.Load(newState.root);
+            particleEmitter.ApplyEffect();
+            RefreshParticleEffectEditor();
         }
     }
 }

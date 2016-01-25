@@ -16,6 +16,24 @@ class AssetMapping
 
 Array<AssetMapping> assetMappings;
 
+String assetImporterPath;
+
+int ExecuteAssetImporter(Array<String>@ args)
+{
+    if (assetImporterPath.empty)
+    {
+        String exeSuffix = "";
+        if (GetPlatform() == "Windows")
+            exeSuffix = ".exe";
+        // Try both with and without the tool directory; a packaged build may not have the tool directory
+        assetImporterPath = fileSystem.programDir + "tool/AssetImporter" + exeSuffix;
+        if (!fileSystem.FileExists(assetImporterPath))
+            assetImporterPath = fileSystem.programDir + "AssetImporter" + exeSuffix;
+    }
+
+    return fileSystem.SystemRun(assetImporterPath, args);
+}
+
 void ImportModel(const String&in fileName)
 {
     if (fileName.empty)
@@ -39,7 +57,7 @@ void ImportModel(const String&in fileName)
     if (applyMaterialList)
         args.Push("-l");
 
-    if (fileSystem.SystemRun(fileSystem.programDir + "AssetImporter", args) == 0)
+    if (ExecuteAssetImporter(args) == 0)
     {
         Node@ newNode = editorScene.CreateChild(GetFileName(fileName));
         StaticModel@ newModel = newNode.CreateComponent("StaticModel");
@@ -55,6 +73,8 @@ void ImportModel(const String&in fileName)
 
         FocusNode(newNode);
     }
+    else
+        log.Error("Failed to execute AssetImporter to import model");
 }
 
 void ImportScene(const String&in fileName)
@@ -70,24 +90,32 @@ void ImportScene(const String&in fileName)
     else
     {
         // Export scene to a temp file, then load and delete it if successful
-        String tempSceneName = sceneResourcePath + TEMP_SCENE_NAME;
+        Array<String> options = importOptions.Trimmed().Split(' ');
+        bool isBinary = false;
+        for (uint i = 0; i < options.length; ++i)
+            if (options[i] == "-b")
+                isBinary = true;
+        String tempSceneName = sceneResourcePath + (isBinary ? TEMP_BINARY_SCENE_NAME : TEMP_SCENE_NAME);
+
         Array<String> args;
         args.Push("scene");
         args.Push("\"" + fileName + "\"");
         args.Push("\"" + tempSceneName + "\"");
         args.Push("-p \"" + sceneResourcePath + "\"");
-        Array<String> options = importOptions.Trimmed().Split(' ');
         for (uint i = 0; i < options.length; ++i)
             args.Push(options[i]);
         if (applyMaterialList)
             args.Push("-l");
-        if (fileSystem.SystemRun(fileSystem.programDir + "AssetImporter", args) == 0)
+
+        if (ExecuteAssetImporter(args) == 0)
         {
             skipMruScene = true; // set to avoid adding tempscene to mru
             LoadScene(tempSceneName);
             fileSystem.Delete(tempSceneName);
             UpdateWindowTitle();
         }
+        else
+            log.Error("Failed to execute AssetImporter to import scene");
     }
 }
 
@@ -415,7 +443,7 @@ void ConvertModel(const String&in modelName, const String&in filePath, Array<Str
         args.Push("\"" + xmlFileName + "\"");
         args.Push("\"" + outFileName + "\"");
         args.Push("-a");
-        fileSystem.SystemRun(fileSystem.programDir + "OgreImporter", args);
+        fileSystem.SystemRun(fileSystem.programDir + "tool/OgreImporter", args);
     }
 
     convertedModels.Push(modelName);
