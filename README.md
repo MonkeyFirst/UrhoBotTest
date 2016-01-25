@@ -31,7 +31,7 @@ See the [YouTube video](https://www.youtube.com/watch?v=yNIsJa_RqB8) of the orig
 
 ## How it looks now (work in progress)
 
-![screenshot](https://raw.githubusercontent.com/valera-rozuvan/stuff/master/images/strange-urho3d-behavior.png "screenshot")
+![screenshot](https://raw.githubusercontent.com/valera-rozuvan/stuff/master/images/strange-urho3d-behavior-2.png "screenshot")
 
 ## Errors while running the built project
 
