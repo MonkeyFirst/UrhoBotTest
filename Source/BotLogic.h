@@ -1,9 +1,9 @@
 #pragma once
 #include "Common.h"
-#include "LogicComponent.h"
-#include "AnimatedModel.h"
-#include "AnimationState.h"
-#include "RigidBody.h"
+#include "Urho3D/Scene/LogicComponent.h"
+#include "Urho3D/Graphics/AnimatedModel.h"
+#include "Urho3D/Graphics/AnimationState.h"
+#include "Urho3D/Physics/RigidBody.h"
 #include <stack>
 
 namespace Urho3D
@@ -20,9 +20,9 @@ namespace Urho3D
 
 using namespace Urho3D;
 
-class BotLogic : public LogicComponent 
+class BotLogic : public LogicComponent
 {
-	OBJECT(BotLogic);
+	URHO3D_OBJECT(BotLogic, LogicComponent);
 public:
 	/// Construct.
 	BotLogic(Context* context);
@@ -35,7 +35,7 @@ public:
 
 	// גûחûגאועסÿ ךאזהûי ךאהנ ?
 	void Update(float timeStep);
-	
+
 	/// Handle physics world update. Called by LogicComponent base class.
 	virtual void FixedUpdate(float timeStep);
 
@@ -66,7 +66,7 @@ private:
 	SharedPtr<Node> wayPoints[4];
 	std::stack<Vector3> ws;
 	PODVector<Vector3> currentPath_;
-	
+
 
 
 

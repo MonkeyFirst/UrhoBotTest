@@ -1,6 +1,6 @@
 #include "Common.h"
 
-DEFINE_APPLICATION_MAIN(UrhoQuickStart)
+
 
 UrhoQuickStart::UrhoQuickStart(Context* context) : Application(context)
 {
@@ -8,7 +8,7 @@ UrhoQuickStart::UrhoQuickStart(Context* context) : Application(context)
 	engineParameters_["FullScreen"]  = false;
 	engineParameters_["Headless"]    = false;
 	engineParameters_["WindowWidth"] = 1280;
-	engineParameters_["WindowHeight"] = 720; 
+	engineParameters_["WindowHeight"] = 720;
 	engineParameters_["LogName"]     = GetSubsystem<FileSystem>()->GetAppPreferencesDir("urho3d", "logs") + GetTypeName() + ".log";
 	//engineParameters_["RenderPath"] = "Bin\CoreData\RenderPaths\Deferred.xml";
 	//engineParameters_["FlushGPU"] = true;
@@ -47,7 +47,7 @@ void UrhoQuickStart::GenerateNavMesh()
 }
 
 
-void UrhoQuickStart::LoadScene(Urho3D::String sceneFileName) 
+void UrhoQuickStart::LoadScene(Urho3D::String sceneFileName)
 {
 	scene_ = new Scene(context_);
 	File sceneFile(context_, GetSubsystem<FileSystem>()->GetProgramDir() + "Data/Scenes/" + sceneFileName, FILE_READ);
@@ -68,7 +68,7 @@ void UrhoQuickStart::CameraSetup(Urho3D::String cameraNodeName)
 	renderer->SetViewport(0, viewport);
 
 	yaw_ = 0.0f;
-	pitch_ = 0.0f;	
+	pitch_ = 0.0f;
 }
 
 bool UrhoQuickStart::Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawable)
@@ -105,7 +105,7 @@ void UrhoQuickStart::OtherSetup()
 
 	playerNode_ = scene_->GetChild("playerNode", true);
 	playerScript_ = playerNode_->CreateComponent<Character>();
-	
+
 	botNode_ = scene_->GetChild("botNode", true);
 	botScript_ = botNode_->CreateComponent<BotLogic>();
 
@@ -123,19 +123,19 @@ void UrhoQuickStart::CreateConsole()
 	Console* console = engine_->CreateConsole();
 	console->SetDefaultStyle(xmlFile);
 	console->GetBackground()->SetOpacity(0.8f);
-	
+
 }
 
 
 void UrhoQuickStart::SubscribeToEvents()
 {
-	SubscribeToEvent(E_UPDATE, HANDLER(UrhoQuickStart, HandleUpdate));
-	SubscribeToEvent(E_KEYDOWN, HANDLER(UrhoQuickStart, HandleKeyDown));
-	SubscribeToEvent(E_SCENEUPDATE, HANDLER(UrhoQuickStart, HandleSceneUpdate));
-	SubscribeToEvent(E_POSTRENDERUPDATE, HANDLER(UrhoQuickStart, HandlePostRenderUpdate));
+	SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(UrhoQuickStart, HandleUpdate));
+	SubscribeToEvent(E_KEYDOWN, URHO3D_HANDLER(UrhoQuickStart, HandleKeyDown));
+	SubscribeToEvent(E_SCENEUPDATE, URHO3D_HANDLER(UrhoQuickStart, HandleSceneUpdate));
+	SubscribeToEvent(E_POSTRENDERUPDATE, URHO3D_HANDLER(UrhoQuickStart, HandlePostRenderUpdate));
 }
 
-void UrhoQuickStart::CameraViewRotate(float timeStep) 
+void UrhoQuickStart::CameraViewRotate(float timeStep)
 {
 	Input* input = GetSubsystem<Input>();
 
@@ -175,7 +175,7 @@ void UrhoQuickStart::HandleKeyDown(StringHash eventType, VariantMap& eventData)
 {
 	using namespace KeyDown;
 	int key = eventData[P_KEY].GetInt();
-	
+
 	if (key == KEY_ESC)
 	{
 		Console* console = GetSubsystem<Console>();
@@ -185,7 +185,7 @@ void UrhoQuickStart::HandleKeyDown(StringHash eventType, VariantMap& eventData)
 
 			engine_->Exit();
 	}
-	else if (key == KEY_F1) 
+	else if (key == KEY_F1)
 	{
 		Console* console = GetSubsystem<Console>();
 		console->Toggle();
@@ -193,18 +193,18 @@ void UrhoQuickStart::HandleKeyDown(StringHash eventType, VariantMap& eventData)
 
 	if (key == KEY_F2) drawDebug_ = !drawDebug_;
 
-	if (key == KEY_E) 
+	if (key == KEY_E)
 	{
 		Vector3 hitPos;
 		Drawable* hitDrawable;
 		NavigationMesh* navMesh = scene_->GetComponent<NavigationMesh>();
 
-		if (Raycast(250.0f, hitPos, hitDrawable)) 
+		if (Raycast(250.0f, hitPos, hitDrawable))
 		{
 			Vector3 pathPos = navMesh->FindNearestPoint(hitPos, Vector3(2.0f, 2.0f, 2.0f));
-			
+
 			botScript_->AddPath(botNode_->GetWorldPosition(), pathPos);
-			
+
 		}
 	}
 }
@@ -222,3 +222,6 @@ void UrhoQuickStart::HandlePostRenderUpdate(StringHash eventType, VariantMap& ev
 		botScript_->DrawBotDebugInfo();
 	}
 }
+
+
+URHO3D_DEFINE_APPLICATION_MAIN(UrhoQuickStart)
