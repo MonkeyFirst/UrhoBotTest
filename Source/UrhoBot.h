@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Application.h"
-#include "Plane.h"
-#include "RigidBody.h"
+#include "Urho3D/Engine/Application.h"
+#include "Urho3D/Math/Plane.h"
+#include "Urho3D/Physics/RigidBody.h"
 #include "Character.h"
 #include "BotLogic.h"
 
@@ -18,7 +18,7 @@ using namespace Urho3D;
 
 class UrhoQuickStart : public Application
 {
-	OBJECT(UrhoQuickStart);
+	URHO3D_OBJECT(UrhoQuickStart, Application);
 
 public:
 	UrhoQuickStart(Context* context);

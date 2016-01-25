@@ -16,7 +16,7 @@ void Character::RegisterObject(Context* context)
 void Character::Start()
 {
 	// Component has been inserted into its scene node. Subscribe to events now
-	SubscribeToEvent(GetNode(), E_NODECOLLISION, HANDLER(Character, HandleNodeCollision));
+	SubscribeToEvent(GetNode(), E_NODECOLLISION, URHO3D_HANDLER(Character, HandleNodeCollision));
 	rigidbody_ = GetNode()->GetComponent<RigidBody>();
 	//rigidbody_->SetFriction(1.0f);
 
@@ -25,7 +25,7 @@ void Character::Start()
 
 }
 
-void Character::Update(float timeStep) 
+void Character::Update(float timeStep)
 {
 
 }
@@ -46,7 +46,7 @@ bool Character::Raycast(float maxDistance, Vector3& hitPos, Drawable*& hitDrawab
 	PODVector<RayQueryResult> results;
 	//RayOctreeQuery query(results, cameraRay, RAY_TRIANGLE, maxDistance, DRAWABLE_GEOMETRY);
 	RayOctreeQuery query(results, gunRay, RAY_TRIANGLE, maxDistance, DRAWABLE_GEOMETRY, -1);
-	
+
 
 	Node* node = GetNode(); // playerNode
 	Scene* scene = node->GetScene(); // root scene
@@ -77,7 +77,7 @@ void Character::FixedUpdate(float timeStep)
 	worldRotation.z_ = 0.0f;
 
 	Vector3 oldVel = rigidbody_->GetLinearVelocity();
-	
+
 	if (input->GetKeyDown('W'))
 		//cameraNode_->Translate(Vector3::FORWARD * MOVE_SPEED * timeStep);
 		rigidbody_->SetLinearVelocity(worldRotation * Vector3::FORWARD * MOVE_SPEED * timeStep);
@@ -94,15 +94,15 @@ void Character::FixedUpdate(float timeStep)
 		rigidbody_->SetLinearVelocity(worldRotation * Vector3::RIGHT * MOVE_SPEED * timeStep);
 
 	static bool isAlredyJumping = false;
-	if (input->GetKeyDown(KEY_SPACE)) 
+	if (input->GetKeyDown(KEY_SPACE))
 	{
-		if (isAlredyJumping == false) 
+		if (isAlredyJumping == false)
 		{
 			rigidbody_->SetLinearVelocity(worldRotation * Vector3::UP * MOVE_SPEED  * timeStep);
 			isAlredyJumping = true;
 		}
 	}
-	else 
+	else
 	{
 		isAlredyJumping = false;
 
@@ -110,15 +110,15 @@ void Character::FixedUpdate(float timeStep)
 
 	static bool isAlradyFired = false;
 
-	if (input->GetMouseButtonDown(MOUSEB_LEFT)) 
+	if (input->GetMouseButtonDown(MOUSEB_LEFT))
 	{
-		if (!isAlradyFired) 
+		if (!isAlradyFired)
 		{
-			
+
 			isAlradyFired = true;
-		}	
-	} 
-	else 
+		}
+	}
+	else
 	{
 		isAlradyFired = false;
 	}
@@ -135,7 +135,7 @@ void Character::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 	Vector3 pos = contacts.ReadVector3(); // точка столкновения
 
 	Variant myAttr = contact_node->GetVar("type");
-	if ( myAttr.GetString() == "value") 
+	if ( myAttr.GetString() == "value")
 	{
 
 	}

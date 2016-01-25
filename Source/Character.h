@@ -1,7 +1,7 @@
 #pragma once
 #include "Common.h"
-#include "LogicComponent.h"
-#include "Controls.h"
+#include "Urho3D/Scene/LogicComponent.h"
+#include "Urho3D/Input/Controls.h"
 
 
 namespace Urho3D
@@ -18,9 +18,9 @@ namespace Urho3D
 
 using namespace Urho3D;
 
-class Character : public LogicComponent 
+class Character : public LogicComponent
 {
-	OBJECT(Character);
+	URHO3D_OBJECT(Character, LogicComponent);
 public:
 	/// Construct.
 	Character(Context* context);

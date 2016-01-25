@@ -15,13 +15,13 @@ void BotLogic::RegisterObject(Context* context)
 void BotLogic::Start()
 {
 	// Component has been inserted into its scene node. Subscribe to events now
-	SubscribeToEvent(GetNode(), E_NODECOLLISION, HANDLER(BotLogic, HandleNodeCollision));
+	SubscribeToEvent(GetNode(), E_NODECOLLISION, URHO3D_HANDLER(BotLogic, HandleNodeCollision));
 	rigidbody_ = GetNode()->GetComponent<RigidBody>();
 
 	animModelBot_ = GetComponent<AnimatedModel>();
 	lasersNode_ = GetNode()->GetChild("lasersNode", true);
 	animModelLasers_ = lasersNode_->GetComponent<AnimatedModel>();
-	
+
 	animStateIdle_ = animModelBot_->GetAnimationStates()[0];
 	animStateIdle_->SetLooped(true);
 	animStateIdle_->SetLayer(0);
@@ -45,10 +45,10 @@ void BotLogic::Start()
 	AddWayPoints(wayPoints[1]->GetWorldPosition());
 	AddWayPoints(wayPoints[2]->GetWorldPosition());
 	AddWayPoints(wayPoints[3]->GetWorldPosition());
-		
+
 }
 
-void BotLogic::AddPath(Vector3 start_, Vector3 end_) 
+void BotLogic::AddPath(Vector3 start_, Vector3 end_)
 {
 	currentPath_.Clear();
 	NavigationMesh* navMesh = GetNode()->GetScene()->GetComponent<NavigationMesh>();
@@ -64,7 +64,7 @@ void BotLogic::FollowPath(float timeStep)
 		// Rotate Jack toward next waypoint to reach and move. Check for not overshooting the target
 		float SPEED = 20.0f;
 		float distance = (GetNode()->GetWorldPosition() - nextWaypoint).Length();
-		
+
 		Vector3 dir = nextWaypoint - GetNode()->GetWorldPosition();
 		Vector3 lookAt = nextWaypoint;
 
@@ -73,11 +73,11 @@ void BotLogic::FollowPath(float timeStep)
 
 		dir.Normalize();
 		GetNode()->LookAt(lookAt, Vector3::UP, TS_WORLD);
-		
+
 		RigidBody* rigidbody_ = GetComponent<RigidBody>();
 		Vector3 vel = rigidbody_->GetLinearVelocity();
 		if (vel.Length() < 5.0f) rigidbody_->ApplyForce(dir * SPEED);
-		
+
 		//GetNode()->Translate(Vector3::FORWARD * move);
 
 		// Remove waypoint if reached it
@@ -86,7 +86,7 @@ void BotLogic::FollowPath(float timeStep)
 	}
 }
 
-void BotLogic::DrawBotDebugInfo() 
+void BotLogic::DrawBotDebugInfo()
 {
 	DebugRenderer* debug = GetNode()->GetScene()->GetComponent<DebugRenderer>();
 	if (!ws.empty())
@@ -96,9 +96,9 @@ void BotLogic::DrawBotDebugInfo()
 	if (currentPath_.Size() > 0)
 	{
 		Vector3 offset(0.0f,0.5f,0.0f);
-		
+
 		debug->AddLine(GetNode()->GetPosition() + offset, currentPath_[0] + offset, Color(1.0f, 1.0f, 1.0f));
-		
+
 
 		for (unsigned i = 0; i < currentPath_.Size() - 1; ++i)
 			debug->AddLine(currentPath_[i] + offset, currentPath_[i + 1]+offset, Color(1.0f, 1.0f, 1.0f));
@@ -106,48 +106,48 @@ void BotLogic::DrawBotDebugInfo()
 
 }
 
-void BotLogic::ExecuteWayPointsStack(float timeStep) 
+void BotLogic::ExecuteWayPointsStack(float timeStep)
 {
 	static bool isEndPath = false;
 	const float SPEED = 20.0f;
 
 	if (ws.empty())
 		isEndPath = true;
-	else 
+	else
 	{
 		isEndPath = false;
 
 		Vector3 wp = GetNode()->GetWorldPosition();
 		float distance = Vector3(ws.top() - wp).Length();
-	
-		if (distance < 10.0f) 
+
+		if (distance < 10.0f)
 		{
-			if (!ws.empty()) 
-			{  
+			if (!ws.empty())
+			{
 				ws.pop();
 			}
-			else 
+			else
 			{
 				isEndPath = true;
 			}
 		}
-		else 
+		else
 		{
 			Vector3 direction(ws.top()- wp);
 			direction.y_ = 0.0f;
-			
+
 			direction.Normalize();
 			RigidBody* rigidbody_ = GetComponent<RigidBody>();
 			Vector3 target = ws.top();
-			
+
 			target.y_ = wp.y_; // fix horizont bot see by it self y
 
 			GetNode()->LookAt(target, Vector3::UP, TS_WORLD);
 			Vector3 vel = rigidbody_->GetLinearVelocity();
-			
+
 			if (vel.Length() < 5.0) rigidbody_->ApplyForce(direction * SPEED);
 			//rigidbody_->SetLinearVelocity(direction * SPEED * timeStep);
-			
+
 		}
 	}
 
@@ -155,13 +155,13 @@ void BotLogic::ExecuteWayPointsStack(float timeStep)
 
 }
 
-void BotLogic::AddWayPoints(Vector3 position) 
+void BotLogic::AddWayPoints(Vector3 position)
 {
 	ws.push(position);
 }
 
 
-void BotLogic::Update(float timeStep) 
+void BotLogic::Update(float timeStep)
 {
 
 	RigidBody* rigidbody_ = GetComponent<RigidBody>();
@@ -170,33 +170,33 @@ void BotLogic::Update(float timeStep)
 
 	if (animStateWalk_)
 	{
-		
+
 		animStateWalk_->SetWeight( s > 1.0f ? 1.0f : s );
 		animStateWalk_->AddTime(timeStep);
 
 
 	}
 
-	if (animStateIdle_) 
+	if (animStateIdle_)
 	{
 		animStateIdle_->SetWeight(1.0f);
 		animStateIdle_->AddTime(timeStep);
 	}
 
-	if (animStateLasers_) 
+	if (animStateLasers_)
 	{
-		if (s > 0.1f) 
+		if (s > 0.1f)
 		{
 			animStateLasers_->AddTime(timeStep);
 			// set normal speed animation
 			//animStateLasers_->SetSpeed(1.0f);
-		}else 
+		}else
 		{
 			animStateLasers_->AddTime(timeStep / 2.0f);
 			//slowdown animation speed by half
-			//animStateLasers_->SetSpeed(0.5f);		
+			//animStateLasers_->SetSpeed(0.5f);
 		}
-		
+
 	}
 
 }
@@ -211,12 +211,12 @@ void BotLogic::FixedUpdate(float timeStep)
 
 	Quaternion worldRotation = GetNode()->GetWorldRotation();
 	worldRotation.z_ = 0.0f;
-	
+
 	static bool isUpPressed = false;
 	static bool isDownPressed = false;
 	static bool isLeftPressed = false;
 	static bool isRightPressed = false;
-	
+
 	if (input->GetKeyDown(KEY_UP) && isUpPressed == false)
 	{
 		isUpPressed = true;
@@ -239,7 +239,7 @@ void BotLogic::FixedUpdate(float timeStep)
 		isDownPressed = false;
 	}
 
-	if (input->GetKeyDown(KEY_LEFT) && isLeftPressed == false) 
+	if (input->GetKeyDown(KEY_LEFT) && isLeftPressed == false)
 	{
 		isLeftPressed = true;
 		GetNode()->LookAt(Vector3::LEFT, Vector3::UP, TS_LOCAL);
@@ -250,7 +250,7 @@ void BotLogic::FixedUpdate(float timeStep)
 		isLeftPressed = false;
 	}
 
-	if (input->GetKeyDown(KEY_RIGHT) && isRightPressed == false) 
+	if (input->GetKeyDown(KEY_RIGHT) && isRightPressed == false)
 	{
 		isRightPressed = true;
 		GetNode()->LookAt(Vector3::RIGHT, Vector3::UP, TS_LOCAL);
@@ -277,7 +277,7 @@ void BotLogic::HandleNodeCollision(StringHash eventType, VariantMap& eventData)
 	Vector3 pos = contacts.ReadVector3(); // точка столкновения
 
 	Variant myAttr = contact_node->GetVar("type");
-	if ( myAttr.GetString() == "value") 
+	if ( myAttr.GetString() == "value")
 	{
 
 	}
